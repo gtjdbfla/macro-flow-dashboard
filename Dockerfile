@@ -9,12 +9,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# .py/폴더는 통째로 넣는다(파일을 하나씩 적다 빠뜨려 배포가 깨진 전례가 있다).
-COPY app.py ./
-COPY src/ src/
-COPY backtest/ backtest/
-COPY scripts/ scripts/
-COPY .streamlit/ .streamlit/
+# 폴더를 하나씩 적다 빠뜨려 배포가 두 번 깨졌다(scoring/). 통째로 넣고 .dockerignore로 거른다.
+COPY . .
 
 EXPOSE 8503
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
