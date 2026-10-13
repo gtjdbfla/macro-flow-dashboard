@@ -16,8 +16,12 @@ YAHOO = {
     "^VIX": "VIX", "^MOVE": "MOVE", "DX-Y.NYB": "DXY", "CL=F": "WTI", "GC=F": "Gold",
     "^TNX": "US10Y(yahoo)", "HYG": "HY bond ETF", "LQD": "IG bond ETF", "TLT": "20Y+ Treasury",
     # 한국
-    "^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KOSPI200", "KRW=X": "USDKRW",
+    "^KS11": "KOSPI", "^KQ11": "KOSDAQ", "KRW=X": "USDKRW",
     "005930.KS": "Samsung", "000660.KS": "SK hynix",
+    # 한국 업종 ETF(상장일부터만 존재). ^KS200은 이력이 없어 KODEX200을 KOSPI200 대용으로 쓴다.
+    "069500.KS": "KODEX200", "091160.KS": "KR Semiconductor", "091180.KS": "KR Auto",
+    "091170.KS": "KR Banks", "143860.KS": "KR Healthcare/Biotech", "117460.KS": "KR Energy&Chem",
+    "305720.KS": "KR Secondary Battery", "466920.KS": "KR Shipbuilding", "463250.KS": "KR Defense",
 }
 
 # FRED 시리즈. 월/분기 지표는 vintage(발표시점)로 받는다.

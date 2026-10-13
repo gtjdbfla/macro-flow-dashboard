@@ -11,6 +11,18 @@ st.set_page_config(page_title="Macro & Capital Flow", layout="wide")
 st.title("Macro & Capital Flow")
 st.caption("Phase 1 — 데이터 파이프라인. 분석·점수 화면은 백테스트 검증 후에 붙는다.")
 
+st_path = PARQUET / "features_state.parquet"
+if st_path.exists():
+    S = pd.read_parquet(st_path).dropna(subset=["state_key"])
+    cur = S.iloc[-1]
+    st.subheader(f"현재 매크로 상태 ({S.index[-1].date()})")
+    c = st.columns(5)
+    for col, (lab, key) in zip(c, [("Regime", "regime"), ("Growth", "growth"), ("Inflation", "inflation"),
+                                   ("Policy", "policy"), ("Liquidity", "liquidity")]):
+        col.metric(lab, cur[key])
+    st.caption(f"Dollar: {cur['dollar']} · 같은 state_key를 가진 과거 일수: "
+               f"{int((S['state_key'] == cur['state_key']).sum())} / {len(S)}  (규칙 고정, 튜닝 없음 — Phase 3에서 검증)")
+
 cov_path = DATA_DIR / "coverage.json"
 if not cov_path.exists():
     st.warning("아직 수집된 데이터가 없습니다 (scripts/collect.py).")

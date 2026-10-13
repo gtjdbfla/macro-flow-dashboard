@@ -14,11 +14,12 @@ def _fname(symbol: str) -> str:
 
 
 def fetch(symbol: str) -> pd.DataFrame:
+    # range=max는 종목에 따라 월봉으로 내려온다(2026-10-13 발견). period1=0으로 일봉을 강제한다.
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
     last = None
     for attempt in range(3):
         try:
-            r = requests.get(url, params={"range": "max", "interval": "1d"}, headers=UA, timeout=30)
+            r = requests.get(url, params={"period1": 0, "period2": int(time.time()) + 86400, "interval": "1d"}, headers=UA, timeout=30)
             r.raise_for_status()
             res = r.json()["chart"]["result"][0]
             break
