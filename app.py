@@ -135,8 +135,8 @@ if sec is not None and len(sec):
     with c2:
         st.subheader("회전 지도 (SPY 대비 상대강도)")
         fig = go.Figure()
-        fig.add_hline(y=0, line_width=1, line_color="#64748b66")
-        fig.add_vline(x=0, line_width=1, line_color="#64748b66")
+        fig.add_hline(y=0, line_width=1, line_color="rgba(100,116,139,0.4)")
+        fig.add_vline(x=0, line_width=1, line_color="rgba(100,116,139,0.4)")
         fig.add_scatter(x=sec.rs_1m * 100, y=sec.rs_1w * 100, mode="markers+text", text=sec.name,
                         textposition=["top center" if i % 2 == 0 else "bottom center" for i in range(len(sec))], marker=dict(size=11, color=sec.score, colorscale="RdYlGn",
                                                                cmin=0, cmax=100), textfont=dict(size=10))
