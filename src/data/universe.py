@@ -23,7 +23,7 @@ YAHOO = {
 # FRED 시리즈. 월/분기 지표는 vintage(발표시점)로 받는다.
 FRED_DAILY = {
     "DFF": "Fed Funds", "DGS2": "UST 2Y", "DGS10": "UST 10Y", "DFII10": "10Y Real Yield",
-    "T10YIE": "10Y Breakeven", "T10Y2Y": "10Y-2Y", "BAMLH0A0HYG2": "HY OAS", "BAMLC0A0CM": "IG OAS",
+    "T10YIE": "10Y Breakeven", "T10Y2Y": "10Y-2Y", "BAMLH0A0HYM2": "HY OAS", "BAMLC0A0CM": "IG OAS",
     "DTWEXBGS": "Broad USD", "DCOILWTICO": "WTI", "NFCI": "Chicago FCI (weekly)",
     "WALCL": "Fed balance sheet (weekly)", "WTREGEN": "TGA (weekly)", "RRPONTSYD": "ON RRP",
 }
