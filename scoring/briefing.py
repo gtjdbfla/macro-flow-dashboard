@@ -33,11 +33,11 @@ def build(summary: dict) -> list:
     sec = pd.read_parquet(R / "sector_snapshot.parquet")
     if len(sec):
         s = sec.copy()
-        enter = s[(s.rs_1m < 0) & (s.rs_1w > 0) & (s.cmf_1w > 0)]
-        leave = s[(s.rs_1m > 0) & (s.rs_1w < 0) & (s.cmf_1w < 0)]
+        enter = s[(s.rs_1m < 0) & (s.rs_1w > 0) & (s.rs_3d > 0) & (s.cmf_1w > 0)].sort_values("cmf_1w", ascending=False).head(3)
+        leave = s[(s.rs_1m > 0) & (s.rs_1w < 0) & (s.rs_3d < 0) & (s.cmf_1w < 0)].sort_values("cmf_1w").head(3)
         txt = (f"가격+자금 합성 상위: {_names(s, 3)}. 하위: {_names(s, 3, top=False)}."
-               + (f" 유입 전환 후보(1M 약세→1W 강세·자금 유입): {', '.join(enter['name'])}." if len(enter) else "")
-               + (f" 이탈 전환 후보(1M 강세→1W 약세·자금 유출): {', '.join(leave['name'])}." if len(leave) else ""))
+               + (f" 유입 전환 후보(1M 약세→1W·3D 강세, 자금 유입 큰 순 최대 3개): {', '.join(enter['name'])}." if len(enter) else "")
+               + (f" 이탈 전환 후보(1M 강세→1W·3D 약세, 자금 유출 큰 순 최대 3개): {', '.join(leave['name'])}." if len(leave) else ""))
         out.append({"q": "② 월가의 돈은 어느 섹터로 움직이나?", "grade": "참고",
                     "text": txt + " ※ ETF 자금유입 대신 가격·거래량 기반 대리지표(CMF)이며, 섹터 신호의 예측력은 백테스트에서 불안정했습니다."})
     fw = pd.read_parquet(R / "analog_forward.parquet")
@@ -66,8 +66,10 @@ def build(summary: dict) -> list:
     rows = sorted([r for r in rows if r[1] == r[1]], key=lambda x: -x[1])
     ktxt = ""
     if rows:
-        ktxt = (f" 최근 20거래일 외국인 순매수 비중 상위: {', '.join(f'{n}({v*100:+.1f}%)' for n, v in rows[:2])}"
-                f" / 하위: {', '.join(f'{n}({v*100:+.1f}%)' for n, v in rows[-2:])}.")
+        buy = [f"{n}({v*100:+.1f}%)" for n, v in rows[:2]]
+        sell = [f"{n}({v*100:+.1f}%)" for n, v in rows[-2:][::-1]]
+        ktxt = (f" 최근 20거래일 업종별 외국인 순매수/거래대금: 가장 강한 쪽 {', '.join(buy)}, "
+                f"가장 약한 쪽 {', '.join(sell)}" + (" (전 업종 순매도 — 상대적 순위)." if rows[0][1] < 0 else "."))
     out.append({"q": "④ 그 흐름이 한국에는 며칠 뒤 어떻게 전달되나?", "grade": "검증",
                 "text": f"미국 마감 → 다음 한국 거래일(시차 ≈1일)에 외국인 수급 z {last.pred_foreign_z:+.2f} 예상"
                         f"(표본외 상관 {km['eval']['test']['corr']:.2f}).{ktxt}"})

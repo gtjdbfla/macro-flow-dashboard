@@ -83,6 +83,7 @@ def sector_flows(ctx: Ctx) -> pd.DataFrame:
                 if ctx.asof is not None:
                     d = d[d.index <= ctx.asof]
                 d = d[d["acml_tr_pbmn"] > 0]  # 상장 이전 자리표시 행 제외
+                d = d.assign(acml_tr_pbmn=d["acml_tr_pbmn"] / 1e6)  # 거래대금은 원, 순매수대금은 백만원 -> 백만원으로 통일
                 frames.append(d[["acml_tr_pbmn", "frgn_ntby_tr_pbmn", "orgn_ntby_tr_pbmn"]])
         if not frames:
             continue

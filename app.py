@@ -134,13 +134,14 @@ def rot_table(df):
         "cmf_1m": "1M 자금%p", "cmf_1w": "1W 자금%p"})
     pb = lambda t: st.column_config.ProgressColumn(t, min_value=0, max_value=100, format="%d")  # noqa: E731
     st.dataframe(show, hide_index=True, width="stretch", height=min(40 + 35 * len(show), 460),
-                 column_config={"합성": pb("합성"), "가격": pb("가격"), "자금": pb("자금"),
+                 column_config={"합성": pb("합성"), "가격": st.column_config.NumberColumn("가격", format="%d"),
+                                "자금": st.column_config.NumberColumn("자금", format="%d"),
                                 **{c: st.column_config.NumberColumn(c, format="%+.2f") for c in
                                    ("1M RS%", "1W RS%", "3D RS%", "1M 자금%p", "1W 자금%p")}})
 
 
 if sec is not None and len(sec):
-    c1, c2 = st.columns([1.6, 1])
+    c1, c2 = st.container(), st.container()  # 표 열이 많아 전체 폭을 쓴다
     with c1:
         st.subheader("GICS 11 섹터")
         rot_table(sec)
@@ -155,7 +156,7 @@ if sec is not None and len(sec):
         for x, y, t in [(1, 1, "선도"), (-1, 1, "개선"), (-1, -1, "부진"), (1, -1, "약화")]:
             fig.add_annotation(xref="paper", yref="paper", x=0.5 + 0.47 * x, y=0.5 + 0.47 * y, text=t, showarrow=False,
                                font=dict(size=11, color="#94a3b8"))
-        fig.update_layout(height=430, margin=dict(l=0, r=0, t=8, b=0), xaxis_title="1개월 RS (%)",
+        fig.update_layout(height=460, margin=dict(l=0, r=0, t=8, b=0), xaxis_title="1개월 RS (%)",
                           yaxis_title="1주 RS (%)")
         st.plotly_chart(fig, width="stretch")
     with st.expander("산업/테마 (반도체·소프트웨어·방산·에너지 세부 등)"):
@@ -221,7 +222,8 @@ with c1:
     t["잔차"] = t.actual_next_foreign_z - t.pred_foreign_z
     t = t.rename(columns={"pred_foreign_z": "예측 z", "actual_next_foreign_z": "실제 z"})[["예측 z", "실제 z", "잔차"]]
     t.index = [f"{i.date()}(미국)" for i in t.index]
-    st.dataframe(t.round(2), width="stretch")
+    t = t.round(2).astype(object).where(t.notna(), "휴장")  # 한국이 쉬어 관측이 없는 날
+    st.dataframe(t, width="stretch")
     res = (kh.actual_next_foreign_z - kh.pred_foreign_z).dropna()
     r20 = res.tail(20).mean() / (res.loc[:"2022-12-31"].std())
     st.caption(f"최근 20일 평균 잔차 {r20:+.2f}σ → " + ("한국 외국인이 미국 신호보다 **약하게** 반응(괴리)" if r20 < -0.5 else
@@ -259,7 +261,7 @@ fig.add_bar(x=tab["업종"], y=tab["외국인 20D%"], name="외국인 20일")
 fig.add_bar(x=tab["업종"], y=tab["기관 20D%"], name="기관 20일")
 fig.update_layout(barmode="group", height=280, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="순매수 / 거래대금 (%)",
                   legend=dict(orientation="h", y=1.15))
-cA2, cB2 = st.columns([1, 1.1])
+cA2, cB2 = st.columns([1, 1.5])
 with cA2:
     st.plotly_chart(fig, width="stretch")
 with cB2:
