@@ -47,7 +47,8 @@ if S is None:
     st.warning("분석 결과가 아직 없습니다 (scripts/run_scoring.py).")
     st.stop()
 st.caption(f"기준일 {S['as_of']} (미국 마감 기준) · 펀더멘털 제외, 외부 시장환경만 · 점수 근거는 아래 '검증' 표기를 확인")
-state = feat("state").dropna(subset=["state_key"]).iloc[-1]
+state_hist = feat("state").dropna(subset=["state_key"])
+state = state_hist.iloc[-1]
 
 
 def arrow(label, up, down):
@@ -87,6 +88,11 @@ chips = [f"Regime: {state['regime']}", f"Growth {arrow(state['growth'], 'Acceler
          f"Inflation {arrow(state['inflation'], 'Accelerating', 'Decelerating')}", f"Policy: {state['policy']}",
          f"Liquidity: {state['liquidity']}", f"USD: {state['dollar']}"]
 st.markdown("".join(f'<span class="chip">{c}</span>' for c in chips), unsafe_allow_html=True)
+_runs = state_hist["regime"].ne(state_hist["regime"].shift()).cumsum()
+_days = int((_runs == _runs.iloc[-1]).sum())
+_flips = int(state_hist["regime"].tail(252).ne(state_hist["regime"].tail(252).shift()).sum() - 1)
+st.markdown(f'<div class="small">현재 {state["regime"]} 상태 {_days}거래일째 · 최근 1년 레짐 전환 {_flips}회 '
+            f'(라벨은 21일 평활+히스테리시스, 전체 평균 연 약 4회)</div>', unsafe_allow_html=True)
 st.markdown('<div class="small">미검증 = 구성요소 중 train+val에서 SPY 20일 선행수익을 안정적으로 예측한 것이 하나도 없어 '
             '가중치를 줄 근거가 없다는 뜻입니다. 현재 위치를 보는 기술적 요약이지 예측이 아닙니다.</div>', unsafe_allow_html=True)
 
@@ -309,10 +315,27 @@ with st.expander("현재 상태 벡터 · 가장 가까운 과거 날짜"):
     st.dataframe(nb[nb.is_nearest].sort_values("dist").head(10).assign(date=lambda x: x.date.dt.date)
                  [["date", "dist", "episode"]].round(3), hide_index=True)
 
+with st.expander("전향 검증 장부 — 앞으로의 실제 데이터로 가설 재검증 (docs/FORWARD_TEST.md)"):
+    L = S.get("ledger") or {}
+    if L.get("n_days"):
+        st.write(f"기록 시작 {L['started']} · 기록 {L['n_days']}일. 과거 백필 없음(등록 이후 데이터만 판정).")
+        h1, h2, h3 = L["h1_korea"], L["h2_vix"], L["h3_kr_sector"]
+        st.table(pd.DataFrame([
+            {"가설": "H1 미국→다음 한국장 외국인 수급 예측", "실현 표본": h1["n"],
+             "현재 결과": "—" if h1["corr"] is None else f"상관 {h1['corr']:.2f}", "판정 조건": "n≥60에서 상관 ≥0.2 유지"},
+            {"가설": "H2 공포(VIX 상위)일 뒤 SPY 20일 수익률이 더 높다", "실현 표본": h2["n_high_fear"],
+             "현재 결과": "—" if h2["median_after"] is None else f"중앙값 {h2['median_after']*100:+.1f}% (무조건 {h2['baseline_median']*100:+.1f}%)",
+             "판정 조건": "독립 사례 ≥8건"},
+            {"가설": "H3 한국 업종 외국인 60일 흐름 → 20일 상대수익", "실현 표본": h3["n_matured"],
+             "현재 결과": "—" if h3["ic_mean"] is None else f"IC {h3['ic_mean']:+.2f}", "판정 조건": "비겹침 ≥12개, IC ≥0.05 & t≥2"}]))
+        st.caption("H2·H3는 20거래일 뒤부터 실현값이 생기고 독립 표본은 20일에 1개 정도라, 의미 있는 판정까지 수개월~1년이 걸립니다.")
+    else:
+        st.write("장부 기록 대기 중")
+
 st.divider()
 with st.expander("방법론·한계·데이터 현황"):
     st.markdown("""
-- **레짐→섹터 매핑은 지지되지 않음**: 검정 2,764건 중 3개 구간(2005–18/2019–22/2023~) 모두 재현 0.47%(우연 기대 ≈1.25%).
+- **레짐→섹터 매핑은 지지되지 않음**: 3개 구간(2005–18/2019–22/2023~)에서 모두 재현된 비율이 우연 기대(≈1.25%) 수준(라벨 v1 0.47%, 지속성 개선 v2 1.0%).
 - **섹터 상대강도·모멘텀의 예측력 불안정**: 단면 IC가 분할마다 부호가 바뀜.
 - **미국→한국 전달은 안정적**: 시차 ≈1거래일. 단 상관이며 인과 아님, 가격(상대수익)으로는 일관되지 않음.
 - **미포함(무료 장기 데이터 없음)**: ETF Fund Flow, 옵션 포지셔닝, 13F, Economic Surprise, ISM.

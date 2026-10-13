@@ -55,8 +55,11 @@ def build(summary: dict) -> list:
     if len(spy):
         r = spy.iloc[0]
         sp = f" SPY 20일 중앙값 {r['median']*100:+.1f}% (무조건 {r.base_median*100:+.1f}%), 승률 {r.win*100:.0f}% (무조건 {r.base_win*100:.0f}%)."
+    rep = pd.read_parquet(R / "regime_replication.parquet")
+    rep = rep[rep.testable]
+    rrate = f"{rep.replicated.mean()*100:.1f}%"
     out.append({"q": "③ 역사적으로 비슷한 환경 뒤에 돈은 어디로 갔나?", "grade": "참고",
-                "text": f"유사 국면 {A['n_episodes']}사례({A['n_days']}일).{sp}{t3} ※ 레짐→섹터 매핑은 3개 구간 재현이 거의 없어(0.47%) "
+                "text": f"유사 국면 {A['n_episodes']}사례({A['n_days']}일).{sp}{t3} ※ 레짐→섹터 매핑은 3개 구간 재현율이 {rrate}로 우연 수준(≈1.25%)이라 "
                         "약한 단서로만 보세요."})
     km = summary["korea_model"]
     kh = pd.read_parquet(R / "korea_model_history.parquet")
