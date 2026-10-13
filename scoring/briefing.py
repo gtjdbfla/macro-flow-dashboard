@@ -35,11 +35,19 @@ def build(summary: dict) -> list:
         s = sec.copy()
         enter = s[(s.rs_1m < 0) & (s.rs_1w > 0) & (s.rs_3d > 0) & (s.cmf_1w > 0)].sort_values("cmf_1w", ascending=False).head(3)
         leave = s[(s.rs_1m > 0) & (s.rs_1w < 0) & (s.rs_3d < 0) & (s.cmf_1w < 0)].sort_values("cmf_1w").head(3)
+        etf = s[s.flow_src == "ETF유입"]
+        fl = ""
+        if len(etf) >= 6:
+            top = etf.sort_values("flow_1m", ascending=False).head(2)
+            bot = etf.sort_values("flow_1m").head(2)
+            tops = ", ".join("%s(%+.1f%%)" % (r["name"], r["flow_1m"] * 100) for _, r in top.iterrows())
+            bots = ", ".join("%s(%+.1f%%)" % (r["name"], r["flow_1m"] * 100) for _, r in bot.iterrows())
+            fl = f" 실제 ETF 순유입(20일, %AUM) 큰 섹터: {tops} / 순유출: {bots}."
         txt = (f"가격+자금 합성 상위: {_names(s, 3)}. 하위: {_names(s, 3, top=False)}."
                + (f" 유입 전환 후보(1M 약세→1W·3D 강세, 자금 유입 큰 순 최대 3개): {', '.join(enter['name'])}." if len(enter) else "")
                + (f" 이탈 전환 후보(1M 강세→1W·3D 약세, 자금 유출 큰 순 최대 3개): {', '.join(leave['name'])}." if len(leave) else ""))
         out.append({"q": "② 월가의 돈은 어느 섹터로 움직이나?", "grade": "참고",
-                    "text": txt + " ※ ETF 자금유입 대신 가격·거래량 기반 대리지표(CMF)이며, 섹터 신호의 예측력은 백테스트에서 불안정했습니다."})
+                    "text": txt + fl + " ※ 실제 설정·환매 기반이지만(SPDR ETF), 이후 수익률 예측력은 약한 역방향 경향만 보여 검증 중입니다."})
     fw = pd.read_parquet(R / "analog_forward.parquet")
     A = summary["analog"]
     spy = fw[(fw.asset == "SPY") & (fw.kind == "abs") & (fw.h == 20)]

@@ -16,6 +16,9 @@ KR_ETF = {"Semis": "091160.KS", "Auto": "091180.KS", "Banks": "091170.KS", "Heal
           "EnergyChem": "117460.KS", "Battery": "305720.KS", "Shipbuilding": "466920.KS", "Defense": "463250.KS"}
 
 
+from src.features.sector_features import SECTORS as US_SECTORS  # noqa: E402
+
+
 def _read():
     if not LEDGER.exists():
         return []
@@ -33,9 +36,11 @@ def record(summary: dict) -> bool:
     state = pd.read_parquet(PARQUET / "features_state.parquet")
     d = pd.Timestamp(asof)
     kh = pd.read_parquet(DATA_DIR / "results" / "korea_model_history.parquet")
+    sec = pd.read_parquet(PARQUET / "features_sector.parquet")
     rec = {"date": asof, "korea_pred_z": float(kh.loc[d, "pred_foreign_z"]) if d in kh.index else None,
            "vix_rank": _f(risk.loc[d, "risk__VIX__level_rank"]), "regime": state.loc[d, "regime"],
-           "kr_foreign_ratio_60d": {s: _f(kor.loc[d, f"kr__{s}_foreign__ratio_60d"]) for s in KR_ETF}}
+           "kr_foreign_ratio_60d": {s: _f(kor.loc[d, f"kr__{s}_foreign__ratio_60d"]) for s in KR_ETF},
+           "us_flow_20d": {t: _f(sec.loc[d, f"sector__{lab}__flow_20d"]) for t, lab in US_SECTORS.items()}}
     LEDGER.parent.mkdir(exist_ok=True)
     with LEDGER.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -86,4 +91,20 @@ def evaluate() -> dict:
         if len(x) >= 5:
             ics.append(pd.Series(x).rank().corr(pd.Series(yy).rank()))
     out["h3_kr_sector"] = {"n_matured": len(ics), "ic_mean": float(np.mean(ics)) if ics else None}
+    # H4 미국 섹터 20일 순유입(%AUM)이 클수록 이후 20일 SPY 대비 수익이 낮다(역방향) -> IC<0 기대
+    ys = {t: fw.rel(t, "SPY", 20) for t in US_SECTORS}
+    ics4 = []
+    for r in rows:
+        d = pd.Timestamp(r["date"])
+        if d not in pos or "us_flow_20d" not in r:
+            continue
+        x, yy = [], []
+        for t in US_SECTORS:
+            v = r["us_flow_20d"].get(t)
+            if v is not None and ys[t] is not None and np.isfinite(ys[t][0][pos[d]]):
+                x.append(v)
+                yy.append(ys[t][0][pos[d]])
+        if len(x) >= 8:
+            ics4.append(pd.Series(x).rank().corr(pd.Series(yy).rank()))
+    out["h4_us_flow"] = {"n_matured": len(ics4), "ic_mean": float(np.mean(ics4)) if ics4 else None}
     return out

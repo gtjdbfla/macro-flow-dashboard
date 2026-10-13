@@ -12,7 +12,7 @@ from .forward_returns import Fwd
 from .stats import SPLITS, split_valid
 
 FEATS = ["rs_5d", "rs_20d", "rs_60d", "rs_accel", "mom_12_1", "volume_z", "cmf_rel_5d", "cmf_rel_20d", "cmf_rel_60d",
-         "cmf_20d"]
+         "cmf_20d", "flow_5d", "flow_20d", "flow_60d", "flow_20d_z"]
 REGIMES = ["ALL", "Goldilocks", "Reflation", "Slowdown", "Stagflation"]
 
 

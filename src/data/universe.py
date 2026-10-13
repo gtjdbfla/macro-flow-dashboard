@@ -11,7 +11,8 @@ YAHOO = {
     "SOXX": "Semiconductor", "SMH": "Semiconductor(VanEck)", "XSD": "Semi(equal)", "IGV": "Software",
     "CIBR": "Cybersecurity", "KBE": "Banks", "KIE": "Insurance", "IBB": "Biotech", "XPH": "Pharma",
     "IHI": "Med Devices", "ITA": "Aerospace&Defense", "XOP": "Oil&Gas E&P", "OIH": "Energy Services",
-    "URA": "Uranium/Nuclear", "COPX": "Copper Miners", "XME": "Metals&Mining", "SLX": "Steel",
+    "XBI": "Biotech(XBI)", "XAR": "Aerospace&Defense(XAR)", "KRE": "Regional Banks", "XHB": "Homebuilders",
+    "XRT": "Retail", "URA": "Uranium/Nuclear", "COPX": "Copper Miners", "XME": "Metals&Mining", "SLX": "Steel",
     # 매크로 가격
     "^VIX": "VIX", "^MOVE": "MOVE", "DX-Y.NYB": "DXY", "CL=F": "WTI", "GC=F": "Gold",
     "^TNX": "US10Y(yahoo)", "HYG": "HY bond ETF", "LQD": "IG bond ETF", "TLT": "20Y+ Treasury",

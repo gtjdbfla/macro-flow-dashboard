@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data import DATA_DIR, cftc, fred, yahoo  # noqa: E402
+from src.data import DATA_DIR, cftc, fred, ssga, yahoo  # noqa: E402
 from src.data.universe import CFTC, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
@@ -40,6 +40,9 @@ if not only or "kis_stocks" in only:
         cov["kis_stocks"] = {"updated": now, "series": kis.collect_stocks(codes)}
     except Exception as e:
         cov["kis_stocks"] = {"updated": now, "error": str(e)[:200], "series": {}}
+
+if not only or "ssga" in only:
+    cov["ssga"] = {"updated": now, "series": ssga.collect()}
 
 cov_path.write_text(json.dumps(cov, ensure_ascii=False, indent=1), encoding="utf-8")
 for src, v in cov.items():

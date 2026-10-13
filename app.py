@@ -131,19 +131,19 @@ sec, ind = rd("sector_snapshot.parquet"), rd("industry_snapshot.parquet")
 
 def rot_table(df):
     d = df.copy()
-    for c in ("rs_3d", "rs_1w", "rs_1m", "cmf_1w", "cmf_1m"):
+    for c in ("rs_3d", "rs_1w", "rs_1m", "cmf_1w", "cmf_1m", "flow_1w", "flow_1m", "flow_3m"):
         d[c] = d[c] * 100
     show = d[["name", "score", "score_price", "score_flow", "direction", "flow_dir", "rs_1m", "rs_1w", "rs_3d",
-              "cmf_1m", "cmf_1w"]].rename(columns={
+              "flow_1m", "flow_1w", "flow_3m", "flow_src"]].rename(columns={
         "name": "섹터", "score": "합성", "score_price": "가격", "score_flow": "자금", "direction": "가격방향",
         "flow_dir": "자금방향", "rs_1m": "1M RS%", "rs_1w": "1W RS%", "rs_3d": "3D RS%",
-        "cmf_1m": "1M 자금%p", "cmf_1w": "1W 자금%p"})
+        "flow_1m": "1M 순유입%AUM", "flow_1w": "1W 순유입%AUM", "flow_3m": "3M 순유입%AUM", "flow_src": "자금 출처"})
     pb = lambda t: st.column_config.ProgressColumn(t, min_value=0, max_value=100, format="%d")  # noqa: E731
     st.dataframe(show, hide_index=True, width="stretch", height=min(40 + 35 * len(show), 460),
                  column_config={"합성": pb("합성"), "가격": st.column_config.NumberColumn("가격", format="%d"),
                                 "자금": st.column_config.NumberColumn("자금", format="%d"),
                                 **{c: st.column_config.NumberColumn(c, format="%+.2f") for c in
-                                   ("1M RS%", "1W RS%", "3D RS%", "1M 자금%p", "1W 자금%p")}})
+                                   ("1M RS%", "1W RS%", "3D RS%", "1M 순유입%AUM", "1W 순유입%AUM", "3M 순유입%AUM")}})
 
 
 if sec is not None and len(sec):
@@ -168,9 +168,9 @@ if sec is not None and len(sec):
     with st.expander("산업/테마 (반도체·소프트웨어·방산·에너지 세부 등)"):
         if ind is not None and len(ind):
             rot_table(ind)
-    st.markdown('<span class="badge no">스냅샷</span> <span class="small">가격 점수=SPY 대비 상대강도 순위, 자금 점수=SPY 대비 '
-                '체이킨 자금흐름(CMF: 고저폭 안에서 종가 위치×거래량) 순위. ETF 설정·환매 자금유입은 무료 장기 데이터가 없어 '
-                '가격·거래량 대리지표를 씁니다. 이 신호들의 이후 수익률 예측력은 백테스트 결과(아래 방법론)를 확인하세요.</span>',
+    st.markdown('<span class="badge no">스냅샷</span> <span class="small">가격 점수=SPY 대비 상대강도 순위, 자금 점수=<b>실제 ETF 순 설정유입(발행좌수 변화×NAV÷순자산)</b> 순위. '
+                'SPDR 11개 섹터·일부 산업 ETF는 SPDR 공시 파일로 실제 유입을 계산하고, 파일이 없는 ETF(iShares·VanEck 등)는 '
+                '체이킨 자금흐름(CMF) 대리지표로 대체(자금 출처 열). 유입 쏠림은 약한 역방향 경향이 관찰돼 전향 검증 중(H4).</span>',
                 unsafe_allow_html=True)
     flow = feat("flow").dropna(how="all")
     cf = flow.iloc[-1]
@@ -320,6 +320,7 @@ with st.expander("전향 검증 장부 — 앞으로의 실제 데이터로 가�
     if L.get("n_days"):
         st.write(f"기록 시작 {L['started']} · 기록 {L['n_days']}일. 과거 백필 없음(등록 이후 데이터만 판정).")
         h1, h2, h3 = L["h1_korea"], L["h2_vix"], L["h3_kr_sector"]
+        h4 = L.get("h4_us_flow", {"n_matured": 0, "ic_mean": None})
         st.table(pd.DataFrame([
             {"가설": "H1 미국→다음 한국장 외국인 수급 예측", "실현 표본": h1["n"],
              "현재 결과": "—" if h1["corr"] is None else f"상관 {h1['corr']:.2f}", "판정 조건": "n≥60에서 상관 ≥0.2 유지"},
@@ -327,7 +328,9 @@ with st.expander("전향 검증 장부 — 앞으로의 실제 데이터로 가�
              "현재 결과": "—" if h2["median_after"] is None else f"중앙값 {h2['median_after']*100:+.1f}% (무조건 {h2['baseline_median']*100:+.1f}%)",
              "판정 조건": "독립 사례 ≥8건"},
             {"가설": "H3 한국 업종 외국인 60일 흐름 → 20일 상대수익", "실현 표본": h3["n_matured"],
-             "현재 결과": "—" if h3["ic_mean"] is None else f"IC {h3['ic_mean']:+.2f}", "판정 조건": "비겹침 ≥12개, IC ≥0.05 & t≥2"}]))
+             "현재 결과": "—" if h3["ic_mean"] is None else f"IC {h3['ic_mean']:+.2f}", "판정 조건": "비겹침 ≥12개, IC ≥0.05 & t≥2"},
+            {"가설": "H4 미국 섹터 20일 ETF 순유입이 클수록 이후 20일 상대수익이 낮다(역방향)", "실현 표본": h4["n_matured"],
+             "현재 결과": "—" if h4["ic_mean"] is None else f"IC {h4['ic_mean']:+.2f}", "판정 조건": "비겹침 ≥12개, 평균 IC ≤−0.05 & t≤−2"}]))
         st.caption("H2·H3는 20거래일 뒤부터 실현값이 생기고 독립 표본은 20일에 1개 정도라, 의미 있는 판정까지 수개월~1년이 걸립니다.")
     else:
         st.write("장부 기록 대기 중")
