@@ -13,6 +13,27 @@ INDUSTRIES = {"SOXX": "Semis", "SMH": "SemisVanEck", "XSD": "SemisEqual", "IGV":
               "IHI": "MedDevices", "ITA": "AeroDefense", "XOP": "OilGas", "OIH": "EnergyServices",
               "URA": "Nuclear", "COPX": "Copper", "XME": "MetalsMining", "SLX": "Steel"}
 HS = (1, 3, 5, 10, 20, 60, 120)
+CMF_N = (3, 5, 20, 60)
+
+
+def cmf(ctx: Ctx, sym: str):
+    """Chaikin Money Flow: sum(CLV x volume)/sum(volume), [-1,1]. 종가가 고저 범위 위쪽에서 큰 거래량으로 끝나면 +(매집)."""
+    df = ctx.px(sym)
+    if df is None or "high" not in df or df["high"].isna().all():
+        return None
+    rng = (df["high"] - df["low"]).where(lambda x: x > 0)
+    clv = ((df["close"] - df["low"]) - (df["high"] - df["close"])) / rng
+    mfv = (clv * df["volume"]).fillna(0)
+    out = {}
+    for n in CMF_N:
+        out[n] = (mfv.rolling(n).sum() / df["volume"].rolling(n).sum()).reindex(ctx.cal)
+    return out
+
+
+def spy_cmf(ctx):
+    if "spy_cmf" not in ctx._cache:
+        ctx._cache["spy_cmf"] = cmf(ctx, "SPY")
+    return ctx._cache["spy_cmf"]
 
 
 def _one(ctx, sym, label, spy):
@@ -27,6 +48,11 @@ def _one(ctx, sym, label, spy):
         o[f"{label}__rs_{h}d"] = (lc - ls).diff(h)  # SPY 대비 초과로그수익
     o[f"{label}__mom_12_1"] = c.shift(21) / c.shift(252) - 1
     o[f"{label}__rs_accel"] = o[f"{label}__rs_5d"] - o[f"{label}__rs_20d"] * (5 / 20)
+    m, m_spy = cmf(ctx, sym), spy_cmf(ctx)
+    if m is not None and m_spy is not None:
+        for n in CMF_N:
+            o[f"{label}__cmf_{n}d"] = m[n]
+            o[f"{label}__cmf_rel_{n}d"] = m[n] - m_spy[n]  # SPY 대비 초과 자금유입(시장 전체 매수세 제거)
     v = ctx.volume(sym)
     if v is not None:
         o[f"{label}__volume_z"] = exp_z(np.log(v.rolling(20).mean() / v.rolling(252).mean()))

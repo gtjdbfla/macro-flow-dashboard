@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from src.data import PARQUET
+from src.data.universe import KR_SECTOR_STOCKS
 
 from .common import Ctx, feats_series
 
@@ -61,4 +62,39 @@ def build(ctx: Ctx) -> pd.DataFrame:
                 o[f"{mkt.upper()}_{who}__net_{h}d_z"] = s_h / (sd * np.sqrt(h))
             o[f"{mkt.upper()}_{who}__pos_frac_20d"] = (daily > 0).rolling(20).mean()
             parts.append(pd.DataFrame(o))
+    parts.append(sector_flows(ctx))
     return pd.concat(parts, axis=1).add_prefix("kr__")
+
+
+def _on_cal(cum: pd.Series, ctx: Ctx) -> pd.Series:
+    return cum.reindex(cum.index.union(ctx.cal)).ffill().reindex(ctx.cal)
+
+
+def sector_flows(ctx: Ctx) -> pd.DataFrame:
+    """업종 대표 종목의 외국인·기관 순매수대금을 업종별로 합산 -> 거래대금 대비 순매수 비율(-1~1).
+    구성은 현재 대형주 고정(생존편향 있음). 종목별 데이터가 있는 날만 합산한다."""
+    out = {}
+    for sector, stocks in KR_SECTOR_STOCKS.items():
+        frames = []
+        for code in stocks:
+            f = PARQUET / f"kis_stock_{code}.parquet"
+            if f.exists():
+                d = pd.read_parquet(f)
+                if ctx.asof is not None:
+                    d = d[d.index <= ctx.asof]
+                d = d[d["acml_tr_pbmn"] > 0]  # 상장 이전 자리표시 행 제외
+                frames.append(d[["acml_tr_pbmn", "frgn_ntby_tr_pbmn", "orgn_ntby_tr_pbmn"]])
+        if not frames:
+            continue
+        tot = pd.concat(frames).groupby(level=0).sum(min_count=1).sort_index()
+        sess = pd.Series(1.0, index=tot.index).cumsum()
+        sess = _on_cal(sess, ctx)
+        tv = _on_cal(tot["acml_tr_pbmn"].cumsum(), ctx)
+        for col, who in (("frgn_ntby_tr_pbmn", "foreign"), ("orgn_ntby_tr_pbmn", "inst")):
+            cum = _on_cal(tot[col].cumsum(), ctx)
+            for h in (1, 5, 20, 60):
+                has = sess.diff(h) > 0
+                out[f"{sector}_{who}__ratio_{h}d"] = (cum.diff(h) / tv.diff(h)).where(has)
+                if h == 20:
+                    out[f"{sector}_{who}__net_20d"] = cum.diff(h).where(has)
+    return pd.DataFrame(out, index=ctx.cal)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backtest import analog  # noqa: E402
-from scoring import engine, korea_model, sector_score  # noqa: E402
+from scoring import briefing, engine, korea_model, sector_score  # noqa: E402
 from src.data import DATA_DIR  # noqa: E402
 
 out = DATA_DIR / "results"
@@ -33,6 +33,7 @@ summary = {
     "components_now": {f"{a}|{b}": (None if v != v else float(v)) for (a, b), v in comp_now.items()},
     "analog": meta,
 }
+summary["briefing"] = briefing.build(summary)
 (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
 print("as_of", summary["as_of"], {k: None if v is None else round(v) for k, v in summary["scores"].items()})
 print("validated", flags)

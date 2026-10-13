@@ -11,7 +11,8 @@ from src.features.sector_features import SECTORS
 from .forward_returns import Fwd
 from .stats import SPLITS, split_valid
 
-FEATS = ["rs_5d", "rs_20d", "rs_60d", "rs_accel", "mom_12_1", "volume_z"]
+FEATS = ["rs_5d", "rs_20d", "rs_60d", "rs_accel", "mom_12_1", "volume_z", "cmf_rel_5d", "cmf_rel_20d", "cmf_rel_60d",
+         "cmf_20d"]
 REGIMES = ["ALL", "Goldilocks", "Reflation", "Slowdown", "Stagflation"]
 
 

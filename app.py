@@ -54,6 +54,14 @@ def arrow(label, up, down):
     return "↑" if label == up else ("↓" if label == down else "→")
 
 
+# ───────────────────────── 0. MONEY FLOW BRIEFING ─────────────────────────
+st.header("MONEY FLOW BRIEFING")
+for it in S.get("briefing", []):
+    tag = '<span class="badge ok">검증</span>' if it["grade"] == "검증" else '<span class="badge no">참고용</span>'
+    st.markdown(f"**{it['q']}** {tag}<br>{it['text']}", unsafe_allow_html=True)
+st.caption("위 문장은 계산값을 그대로 옮긴 요약입니다. '참고용'은 예측력이 확인되지 않은 현재 위치 설명입니다.")
+st.divider()
+
 # ───────────────────────── 1. GLOBAL MARKET REGIME ─────────────────────────
 st.header("GLOBAL MARKET REGIME")
 cards = [("Macro", "macro"), ("Liquidity", "liquidity"), ("Risk Appetite", "risk"),
@@ -117,28 +125,32 @@ sec, ind = rd("sector_snapshot.parquet"), rd("industry_snapshot.parquet")
 
 def rot_table(df):
     d = df.copy()
-    d["rs_3d"], d["rs_1w"], d["rs_1m"], d["rs_3m"] = (d[c] * 100 for c in ("rs_3d", "rs_1w", "rs_1m", "rs_3m"))
-    d["dir"] = d["direction"]
-    show = d[["name", "score", "dir", "rs_1m", "rs_1w", "rs_3d", "rs_3m"]].rename(columns={
-        "name": "섹터", "score": "점수", "dir": "방향", "rs_1m": "1M RS%", "rs_1w": "1W RS%", "rs_3d": "3D RS%", "rs_3m": "3M RS%"})
+    for c in ("rs_3d", "rs_1w", "rs_1m", "cmf_1w", "cmf_1m"):
+        d[c] = d[c] * 100
+    show = d[["name", "score", "score_price", "score_flow", "direction", "flow_dir", "rs_1m", "rs_1w", "rs_3d",
+              "cmf_1m", "cmf_1w"]].rename(columns={
+        "name": "섹터", "score": "합성", "score_price": "가격", "score_flow": "자금", "direction": "가격방향",
+        "flow_dir": "자금방향", "rs_1m": "1M RS%", "rs_1w": "1W RS%", "rs_3d": "3D RS%",
+        "cmf_1m": "1M 자금%p", "cmf_1w": "1W 자금%p"})
+    pb = lambda t: st.column_config.ProgressColumn(t, min_value=0, max_value=100, format="%d")  # noqa: E731
     st.dataframe(show, hide_index=True, width="stretch", height=min(40 + 35 * len(show), 460),
-                 column_config={"점수": st.column_config.ProgressColumn("점수", min_value=0, max_value=100, format="%d"),
+                 column_config={"합성": pb("합성"), "가격": pb("가격"), "자금": pb("자금"),
                                 **{c: st.column_config.NumberColumn(c, format="%+.2f") for c in
-                                   ("1M RS%", "1W RS%", "3D RS%", "3M RS%")}})
+                                   ("1M RS%", "1W RS%", "3D RS%", "1M 자금%p", "1W 자금%p")}})
 
 
 if sec is not None and len(sec):
-    c1, c2 = st.columns([1.35, 1])
+    c1, c2 = st.columns([1.6, 1])
     with c1:
         st.subheader("GICS 11 섹터")
         rot_table(sec)
     with c2:
-        st.subheader("회전 지도 (SPY 대비 상대강도)")
+        st.subheader("회전 지도 (색=자금 점수, 크기=자금 강도)")
         fig = go.Figure()
         fig.add_hline(y=0, line_width=1, line_color="rgba(100,116,139,0.4)")
         fig.add_vline(x=0, line_width=1, line_color="rgba(100,116,139,0.4)")
         fig.add_scatter(x=sec.rs_1m * 100, y=sec.rs_1w * 100, mode="markers+text", text=sec.name,
-                        textposition=["top center" if i % 2 == 0 else "bottom center" for i in range(len(sec))], marker=dict(size=11, color=sec.score, colorscale="RdYlGn",
+                        textposition=["top center" if i % 2 == 0 else "bottom center" for i in range(len(sec))], marker=dict(size=11 + (sec.score_flow - 50).abs() / 5, color=sec.score_flow, colorscale="RdYlGn",
                                                                cmin=0, cmax=100), textfont=dict(size=10))
         for x, y, t in [(1, 1, "선도"), (-1, 1, "개선"), (-1, -1, "부진"), (1, -1, "약화")]:
             fig.add_annotation(xref="paper", yref="paper", x=0.5 + 0.47 * x, y=0.5 + 0.47 * y, text=t, showarrow=False,
@@ -149,9 +161,26 @@ if sec is not None and len(sec):
     with st.expander("산업/테마 (반도체·소프트웨어·방산·에너지 세부 등)"):
         if ind is not None and len(ind):
             rot_table(ind)
-    st.markdown('<span class="badge no">스냅샷</span> <span class="small">섹터 상대강도·모멘텀·거래량의 이후 수익률 예측력은 '
-                '백테스트에서 분할마다 부호가 바뀌었습니다. 자금이 지금 어디로 쏠렸는지 보여줄 뿐 다음 승자를 가리키지 않습니다. '
-                'ETF 자금유입(Fund Flow)은 무료 장기 데이터가 없어 포함하지 않았습니다.</span>', unsafe_allow_html=True)
+    st.markdown('<span class="badge no">스냅샷</span> <span class="small">가격 점수=SPY 대비 상대강도 순위, 자금 점수=SPY 대비 '
+                '체이킨 자금흐름(CMF: 고저폭 안에서 종가 위치×거래량) 순위. ETF 설정·환매 자금유입은 무료 장기 데이터가 없어 '
+                '가격·거래량 대리지표를 씁니다. 이 신호들의 이후 수익률 예측력은 백테스트 결과(아래 방법론)를 확인하세요.</span>',
+                unsafe_allow_html=True)
+    flow = feat("flow").dropna(how="all")
+    cf = flow.iloc[-1]
+    names_cf = {"Technology": "SP_Tech_E-mini", "Financials": "SP_Fin_E-mini", "Energy": "SP_Energy_E-mini",
+                "Healthcare": "SP_Health_E-mini", "Industrials": "SP_Ind_E-mini", "Utilities": "SP_Util_E-mini",
+                "ConsDisc": "SP_ConsDisc_E-mini", "ConsStaples": "SP_ConsStaples_E-mini",
+                "Materials": "SP_Materials_E-mini"}
+    rows = []
+    for nm, key in names_cf.items():
+        g = lambda f: cf.get(f"cftc__{key}__{f}", np.nan)  # noqa: E731
+        rows.append({"섹터": nm, "자산운용 순포지션%OI": g("assetmgr_net") * 100, "백분위": g("assetmgr_net_rank") * 100,
+                     "4주변화%p": g("assetmgr_net_chg4w") * 100, "투기(레버리지) 순포지션%OI": g("levmoney_net") * 100,
+                     "투기 백분위": g("levmoney_net_rank") * 100, "투기 4주변화%p": g("levmoney_net_chg4w") * 100})
+    with st.expander("월가 기관 포지셔닝 — S&P 섹터 E-mini 선물 (CFTC, 주간, 2017~)"):
+        st.dataframe(pd.DataFrame(rows).round(1), hide_index=True, width="stretch")
+        st.caption("자산운용사(장기 기관)와 레버리지 펀드의 선물 순포지션(미결제약정 대비). 화요일 기준·금요일 공표라 최대 며칠 지연. "
+                   "백분위는 해당 계약 이력 대비 위치. 개별 섹터 선물은 규모가 작아 해석에 주의.")
 
 st.divider()
 
@@ -214,16 +243,28 @@ with c2:
     st.plotly_chart(fig, width="stretch")
     st.caption("미국 t일 마감 → 한국 t+L일. 1거래일에 집중되고 3일 이후엔 사라집니다. 상관은 인과가 아닙니다.")
 
-st.subheader("한국 업종 ETF 상대강도 (KOSPI 대비)")
+st.subheader("한국 업종별 외국인·기관 자금흐름 (KIS 종목별 수급 합산)")
 kr = feat("korea")
 rowk = kr.dropna(how="all").iloc[-1]
 names = {"Semis": "반도체", "Auto": "자동차", "Banks": "은행", "Healthcare": "헬스케어/바이오", "EnergyChem": "에너지화학",
          "Battery": "2차전지", "Shipbuilding": "조선", "Defense": "방산"}
-tab = pd.DataFrame([{"업종": v, "5D RS%": rowk.get(f"kr__KR_{k}__rs_5d", np.nan) * 100,
-                     "20D RS%": rowk.get(f"kr__KR_{k}__rs_20d", np.nan) * 100,
-                     "60D RS%": rowk.get(f"kr__KR_{k}__rs_60d", np.nan) * 100} for k, v in names.items()])
-st.dataframe(tab.round(2), hide_index=True, width="stretch")
-st.caption("업종별 외국인 수급은 KIS 종목별 수급 수집이 필요해 아직 없습니다(다음 단계).")
+tab = pd.DataFrame([{"업종": v,
+                     "외국인 1D%": rowk.get(f"kr__{k}_foreign__ratio_1d", np.nan) * 100,
+                     "외국인 5D%": rowk.get(f"kr__{k}_foreign__ratio_5d", np.nan) * 100,
+                     "외국인 20D%": rowk.get(f"kr__{k}_foreign__ratio_20d", np.nan) * 100,
+                     "기관 20D%": rowk.get(f"kr__{k}_inst__ratio_20d", np.nan) * 100,
+                     "업종ETF 20D RS%": rowk.get(f"kr__KR_{k}__rs_20d", np.nan) * 100} for k, v in names.items()])
+fig = go.Figure()
+fig.add_bar(x=tab["업종"], y=tab["외국인 20D%"], name="외국인 20일")
+fig.add_bar(x=tab["업종"], y=tab["기관 20D%"], name="기관 20일")
+fig.update_layout(barmode="group", height=280, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="순매수 / 거래대금 (%)",
+                  legend=dict(orientation="h", y=1.15))
+cA2, cB2 = st.columns([1, 1.1])
+with cA2:
+    st.plotly_chart(fig, width="stretch")
+with cB2:
+    st.dataframe(tab.round(2), hide_index=True, width="stretch")
+st.caption("업종 대표 종목(3~4개)의 순매수대금 합 ÷ 거래대금 합. +면 해당 투자자가 순매수. 대표 종목은 현재 대형주로 고정(과거 구성과 다를 수 있음).")
 
 st.divider()
 

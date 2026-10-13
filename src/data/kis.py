@@ -127,7 +127,16 @@ def fetch_stock(code: str, since="2005-01-01", have_until=None) -> pd.DataFrame:
         floor = max(floor, have_until - dt.timedelta(days=7))  # 최근 며칠은 확정값으로 덮어쓴다
     cursor, frames = dt.date.today(), []
     while cursor > floor:
-        rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
+        try:
+            rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
+        except Exception:
+            time.sleep(2)
+            try:
+                rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
+            except Exception:
+                if frames:  # 상장 이전 구간은 500을 내는 경우가 있다 -> 거기까지를 이력으로 본다
+                    break
+                raise
         if not rows:
             break
         df = pd.DataFrame(rows)
@@ -141,7 +150,8 @@ def fetch_stock(code: str, since="2005-01-01", have_until=None) -> pd.DataFrame:
         return pd.DataFrame(columns=STOCK_COLS)
     df = pd.concat(frames).drop_duplicates("stck_bsop_date")
     df["date"] = pd.to_datetime(df["stck_bsop_date"])
-    return df.set_index("date")[[c for c in STOCK_COLS if c in df.columns]].apply(pd.to_numeric, errors="coerce").sort_index()
+    out = df.set_index("date")[[c for c in STOCK_COLS if c in df.columns]].apply(pd.to_numeric, errors="coerce").sort_index()
+    return out[out["acml_tr_pbmn"] > 0]  # 상장 이전 자리표시 행(NaN/0)과 거래정지일 제거
 
 
 def collect_stocks(codes) -> dict:
