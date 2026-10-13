@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # .py/폴더는 통째로 넣는다(파일을 하나씩 적다 빠뜨려 배포가 깨진 전례가 있다).
 COPY app.py ./
 COPY src/ src/
+COPY backtest/ backtest/
 COPY scripts/ scripts/
 COPY .streamlit/ .streamlit/
 
