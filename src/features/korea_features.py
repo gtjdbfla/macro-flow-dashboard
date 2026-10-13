@@ -49,11 +49,14 @@ def build(ctx: Ctx) -> pd.DataFrame:
             x = d[col].dropna()
             cum = x.cumsum()
             cum = cum.reindex(cum.index.union(ctx.cal)).ffill().reindex(ctx.cal)
-            daily = cum.diff()  # 달력 행 간 합산 순매수
+            # 구간 안에 한국 거래일이 하나도 없으면(한국만 휴장) 순매수 0이 아니라 '관측 없음'이다.
+            sess = pd.Series(1.0, index=x.index).cumsum()
+            sess = sess.reindex(sess.index.union(ctx.cal)).ffill().reindex(ctx.cal)
+            daily = cum.diff().where(sess.diff() > 0)  # 달력 행 간 합산 순매수
             sd = daily.rolling(252, min_periods=120).std()
             o = {}
             for h in (1, 5, 20, 60):
-                s_h = cum.diff(h)
+                s_h = cum.diff(h).where(sess.diff(h) > 0)
                 o[f"{mkt.upper()}_{who}__net_{h}d"] = s_h
                 o[f"{mkt.upper()}_{who}__net_{h}d_z"] = s_h / (sd * np.sqrt(h))
             o[f"{mkt.upper()}_{who}__pos_frac_20d"] = (daily > 0).rolling(20).mean()
