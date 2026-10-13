@@ -1,0 +1,17 @@
+# 외부 공개 경로(Cloudflare Tunnel 등)가 이 포트로 붙는다. HTTPS는 바깥에서 처리하므로 평문 HTTP.
+# 비밀번호: .env의 DASHBOARD_USER / DASHBOARD_PASSWORD_HASH (비어 있으면 인증 없이 열린다).
+:8087 {
+	basic_auth {
+		{$DASHBOARD_USER} {$DASHBOARD_PASSWORD_HASH}
+	}
+
+	# 컨테이너 IP가 재빌드로 바뀌어도 502가 나지 않게 dynamic a를 쓴다.
+	reverse_proxy {
+		dynamic a {
+			name macro-flow-dashboard
+			port 8503
+			refresh 5s
+		}
+	}
+	encode gzip
+}
