@@ -129,7 +129,10 @@ def fetch_stock(code: str, since="2005-01-01", have_until=None) -> pd.DataFrame:
     while cursor > floor:
         try:
             rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
-        except Exception:
+        except Exception as e:
+            if "TIME LIMIT" in str(e) and cursor == dt.date.today():
+                cursor -= dt.timedelta(days=1)  # 당일 자료는 한국 15:40 이후에만 조회된다 -> 전일부터
+                continue
             time.sleep(2)
             try:
                 rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
