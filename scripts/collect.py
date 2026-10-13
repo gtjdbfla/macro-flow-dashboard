@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data import DATA_DIR, cftc, fred, yahoo  # noqa: E402
-from src.data.universe import CFTC, FRED_DAILY, FRED_VINTAGE, YAHOO  # noqa: E402
+from src.data.universe import CFTC, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
 cov_path = DATA_DIR / "coverage.json"
@@ -32,6 +32,14 @@ if not only or "kis" in only:
         cov["kis"] = {"updated": now, "series": kis.collect()}
     except Exception as e:
         cov["kis"] = {"updated": now, "error": str(e)[:200], "series": {}}
+
+if not only or "kis_stocks" in only:
+    try:
+        from src.data import kis
+        codes = [c for g in KR_SECTOR_STOCKS.values() for c in g]
+        cov["kis_stocks"] = {"updated": now, "series": kis.collect_stocks(codes)}
+    except Exception as e:
+        cov["kis_stocks"] = {"updated": now, "error": str(e)[:200], "series": {}}
 
 cov_path.write_text(json.dumps(cov, ensure_ascii=False, indent=1), encoding="utf-8")
 for src, v in cov.items():

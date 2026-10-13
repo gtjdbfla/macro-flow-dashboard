@@ -99,3 +99,61 @@ def collect() -> dict:
         except Exception as e:
             res[m] = {"error": str(e)[:200]}
     return res
+
+
+STOCK_COLS = ["stck_clpr", "acml_vol", "acml_tr_pbmn", "frgn_ntby_qty", "orgn_ntby_qty", "prsn_ntby_qty",
+              "frgn_ntby_tr_pbmn", "orgn_ntby_tr_pbmn", "prsn_ntby_tr_pbmn"]
+
+
+def _stock_page(tok, code, date_str):
+    r = requests.get(
+        f"{BASE}/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
+        headers={"authorization": f"Bearer {tok}", "appkey": os.environ["KIS_APP_KEY"],
+                 "appsecret": os.environ["KIS_APP_SECRET"], "tr_id": "FHPTJ04160001", "custtype": "P"},
+        params={"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code, "FID_INPUT_DATE_1": date_str,
+                "FID_ORG_ADJ_PRC": "", "FID_ETC_CLS_CODE": ""}, timeout=20)
+    r.raise_for_status()
+    j = r.json()
+    if j.get("rt_cd") != "0":
+        raise RuntimeError(j.get("msg1"))
+    return j.get("output2") or j.get("output") or []
+
+
+def fetch_stock(code: str, since="2005-01-01", have_until=None) -> pd.DataFrame:
+    """종목별 일별 투자자 수급(30행/회, 과거로 페이징). have_until이 있으면 그 날짜까지만(증분)."""
+    tok = token()
+    floor = dt.date.fromisoformat(since)
+    if have_until is not None:
+        floor = max(floor, have_until - dt.timedelta(days=7))  # 최근 며칠은 확정값으로 덮어쓴다
+    cursor, frames = dt.date.today(), []
+    while cursor > floor:
+        rows = _stock_page(tok, code, cursor.strftime("%Y%m%d"))
+        if not rows:
+            break
+        df = pd.DataFrame(rows)
+        frames.append(df)
+        oldest = dt.datetime.strptime(df["stck_bsop_date"].min(), "%Y%m%d").date()
+        if oldest >= cursor:
+            break
+        cursor = oldest - dt.timedelta(days=1)
+        time.sleep(0.2)
+    if not frames:
+        return pd.DataFrame(columns=STOCK_COLS)
+    df = pd.concat(frames).drop_duplicates("stck_bsop_date")
+    df["date"] = pd.to_datetime(df["stck_bsop_date"])
+    return df.set_index("date")[[c for c in STOCK_COLS if c in df.columns]].apply(pd.to_numeric, errors="coerce").sort_index()
+
+
+def collect_stocks(codes) -> dict:
+    res = {}
+    for code in codes:
+        f = PARQUET / f"kis_stock_{code}.parquet"
+        try:
+            old = pd.read_parquet(f) if f.exists() else None
+            new = fetch_stock(code, have_until=None if old is None else old.index.max().date())
+            df = new if old is None else pd.concat([old[~old.index.isin(new.index)], new]).sort_index()
+            df.to_parquet(f)
+            res[code] = {"start": str(df.index[0].date()), "end": str(df.index[-1].date()), "n": len(df)}
+        except Exception as e:
+            res[code] = {"error": str(e)[:200]}
+    return res

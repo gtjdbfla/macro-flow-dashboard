@@ -32,6 +32,7 @@ def fetch(symbol: str) -> pd.DataFrame:
     adj = res["indicators"].get("adjclose", [{}])[0].get("adjclose")
     df = pd.DataFrame({
         "date": pd.to_datetime(res["timestamp"], unit="s").normalize(),
+        "open": q.get("open"), "high": q.get("high"), "low": q.get("low"),
         "close": q["close"], "adjclose": adj or q["close"], "volume": q["volume"],
     }).dropna(subset=["close"]).drop_duplicates("date", keep="last")
     return df.set_index("date")
