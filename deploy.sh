@@ -27,6 +27,9 @@ fi
 CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo all)
 echo "$(date '+%F %T') $BEFORE -> $AFTER : $CHANGED"
 docker compose up -d --build
-# Caddyfile은 마운트 파일 변경을 자동 감지하지 않는다.
-docker exec macro-flow-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -1 || true
+# Caddyfile은 단일 파일 바인드 마운트라 git reset이 파일(inode)을 바꾸면 컨테이너가 옛 내용을 계속 본다
+# (2026-10-13 basic_auth 제거가 반영 안 된 원인). reload로는 부족하고 컨테이너를 다시 만들어야 한다.
+case "$CHANGED" in
+    *Caddyfile*|all) docker compose up -d --force-recreate caddy ;;
+esac
 echo "$(date '+%F %T') 배포 완료"
