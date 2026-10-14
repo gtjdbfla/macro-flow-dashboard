@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backtest import flow_rules, korea_sector_flow, korea_transmission, lead_lag, regime_backtest, sector_rotation  # noqa: E402
+from backtest import evidence_upgrade, flow_rules, korea_sector_flow, korea_transmission, lead_lag, regime_backtest, sector_rotation  # noqa: E402
 from src.data import DATA_DIR  # noqa: E402
 
 out = DATA_DIR / "results"
@@ -22,4 +22,12 @@ lead_lag.run().to_parquet(out / "lead_lag.parquet")
 korea_transmission.run().to_parquet(out / "korea_transmission.parquet")
 korea_sector_flow.run().to_parquet(out / "korea_sector_flow.parquet")
 flow_rules.run().to_parquet(out / "flow_rules.parquet")
+import json  # noqa: E402
+
+tests, cond, k2, now = evidence_upgrade.run()
+tests.to_parquet(out / "evidence_tests.parquet")
+cond.to_parquet(out / "evidence_conditions.parquet")
+k2.to_parquet(out / "korea_model_v2.parquet")
+(out / "evidence_now.json").write_text(json.dumps(now, ensure_ascii=False, default=float), encoding="utf-8")
+print("evidence:", tests[tests.primary][["claim", "grade"]].values.tolist())
 print(f"done {time.time() - t0:.0f}s ->", sorted(p.name for p in out.glob('*.parquet')))

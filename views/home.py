@@ -9,7 +9,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 import ui
-from ui import badge, callout, chips, duo, ev_card, kpis, level_kind, load, pct, plot, summary_card, trio
+from ui import badge, callout, chips, duo, ev_card, kpis, level_kind, load, pct, plot, split_rows, summary_card, trio
 
 meta, state = load("views/meta.json"), load("views/state.json")
 sec = load("results/sector_snapshot.parquet")
@@ -138,30 +138,36 @@ def flow_detail():
         st.markdown(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 순서는 위 표와 같은 20일 순유입 금액순입니다. '
                     '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>', unsafe_allow_html=True)
     ui.stage("다음", "다음에 자금이 몰릴 곳 후보", "과거 백테스트 기준 · 근거 등급을 함께 봅니다")
-    rules = pd.DataFrame(nxt["rules"])
-    u = rules[rules.rule == "us_flow"].set_index("split")
-    k = rules[rules.rule == "kr_foreign"].set_index("split")
-    tag = lambda df, s: (f"{df.loc[s].mean_spread:+.2f}%p", f"t {df.loc[s].t:+.1f}") if s in df.index else ("—", "")  # noqa: E731
-    ua = u.loc["all"]
-    mark = lambda df, s, sign: "" if s not in df.index else ("✓ 같은 방향" if df.loc[s].mean_spread * sign > 0 else "✗ 반대")  # noqa: E731
-    card1 = ev_card(badge("단서 · 약함", "warn"), "자금이 몰린 섹터는 이후 20일 덜 오르는 경향", f"{ua.hit:.0f}%",
-                    f"하위 3섹터가 상위 3섹터보다 더 오른 비율 (비겹침 {int(ua.n)}번, 평균 {ua.mean_spread:+.2f}%p, t {ua.t:+.1f})",
-                    [("2005–18", " ".join(tag(u, "train")), mark(u, "train", -1)), ("2019–22", " ".join(tag(u, "val")), mark(u, "val", -1)),
-                     ("2023~", " ".join(tag(u, "test")), mark(u, "test", -1))],
+    T = load("views/evidence_tests.parquet")
+    en = load("views/evidence_now.json")
+    k2 = load("views/korea_model_v2.parquet")
+    P = T[T.primary].set_index("claim")
+    ru = P.loc["us_flow_contrarian"]
+    card1 = ev_card(badge(ru.grade, ui.GRADE_KIND[ru.grade]), "자금이 몰린 섹터는 이후 20일 덜 오르는 경향", f"t {ru.all_t:+.1f}",
+                    f"11개 섹터를 매일 비교한 상관(IC), 20일 후 SPY 대비 · 전체 {int(ru.all_n):,}일", split_rows(ru, "{:+.3f}", -1),
                     chips("지금 부진 가능(자금 쏠림)", [n for n, _ in nxt["in_top"]], "dn") + chips("지금 유리 가능(자금 이탈)", [n for n, _ in nxt["out_top"]], "up"))
-    ka = k.loc["all"]
-    card2 = ev_card(badge("참고 · 유의하지 않음", "mid"), "한국: 외국인이 산 업종은 이후에도 약간 우위", f"{ka.mean_spread:+.2f}%p",
-                    f"외국인 60일 순매수 비중 상위3 − 하위3, 이후 20일 KOSPI 대비 (t {ka.t:+.1f}, {int(ka.n)}번)",
-                    [("2019–22", " ".join(tag(k, "val")), mark(k, "val", 1)), ("2023~", " ".join(tag(k, "test")), mark(k, "test", 1)), ("전체", " ".join(tag(k, "all")), "")],
-                    chips("현재 상위", [n for n, _ in nxt["kr_in_top"]], "up") + chips("현재 하위", [n for n, _ in nxt["kr_out_top"]], "dn"))
+    rf = P.loc["factor_momentum"]
+    fac = {k: v for k, v in en["factor_12m"].items() if k != "Mom"}
+    win = [f"{ui.FACTOR_KO[k]} {v*100:+.0f}%" for k, v in sorted(fac.items(), key=lambda kv: -kv[1]) if v > 0]
+    los = [f"{ui.FACTOR_KO[k]} {v*100:+.0f}%" for k, v in sorted(fac.items(), key=lambda kv: kv[1]) if v <= 0]
+    card2 = ev_card(badge(rf.grade, ui.GRADE_KIND[rf.grade]), "다음에 몰릴 팩터: 최근 12개월 강했던 팩터가 이어서 강한 경향", f"t {rf.all_t:+.1f}",
+                    f"과거 12개월 부호 → 다음 달 수익, 5개 팩터 평균 · 월 평균 {rf.all_mean*100:+.2f}% · 1963~", split_rows(rf, "{:+.4f}", 1),
+                    chips(f"지금 이어질 가능성(12개월 +, {en['asof'][:7]} 기준)", win or ["없음"], "up") + chips("지금 약세 이어질 가능성(12개월 −)", los or ["없음"], "dn"))
     q = quint[quint.period == "oos"]
-    card3 = ev_card(badge("검증됨", "good"), "미국 마감 → 다음 한국 거래일 외국인 수급", f"{z:+.2f}", f"모델값(z) · 지금은 {zdir} (표본외 상관 {ev['korea_eval']['test']['corr']:.2f})",
+    kt = k2[k2.set == "C +직전 외국인 z"].iloc[0]
+    card3 = ev_card(badge("검증됨", "good"), "미국 마감 + 직전 외국인 수급 → 다음 한국 거래일 외국인 수급", f"{z:+.2f}",
+                    f"모델값(z) · 지금은 {zdir} (표본외 상관 {ev['korea_eval']['test']['corr']:.2f}, 설명력 {ev['korea_eval']['test']['r2_vs_mean']*100:.0f}%)",
                     [("예측 최상위 구간", "순매수 확률", f"{q.buy_prob.iloc[-1]:.0f}%"), ("예측 최하위 구간", "순매수 확률", f"{q.buy_prob.iloc[0]:.0f}%"),
                      ("평소", "순매수 확률", "약 47%")],
                     '<div class="chipl">효과는 거의 시가 갭에서 나오고 개장 후 초과수익은 확인되지 않았습니다.</div>')
     trio(card1, card2, card3)
-    callout("이 후보들은 <b>예측이 아니라 약한 과거 패턴을 지금 값에 적용한 것</b>입니다. 첫 번째 카드의 적중 비율은 동전 던지기보다 조금 나은 수준이고 한 구간에서는 반대였습니다. "
-            "매크로 국면이나 상대강도로 섹터를 맞히는 것은 백테스트에서 우연 수준이었고, 스타일 팩터(모멘텀·가치·퀄리티 등)는 무료 자금유입 데이터가 없어 아직 검증하지 못했습니다.")
+    st.markdown(ui.grade_table(T), unsafe_allow_html=True)
+    st.markdown('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
+                '등급 규칙: <b>검증됨</b> = 세 구간 같은 부호 + 2구간 이상 |t|≥2 + 전체 |t|≥3, <b>단서</b> = 전체 |t|≥2 + 2구간 이상 같은 부호, 나머지 <b>참고</b>. '
+                '호라이즌이 여럿이면 사전에 정한 대표 하나만 판정에 씁니다.</p>', unsafe_allow_html=True)
+    callout("<b>이 근거들은 이미 본 과거 데이터에 대한 평가입니다.</b> 전향 장부(근거·방법 페이지)에 사전 등록해 앞으로 쌓이는 실제 데이터로 다시 확인합니다. "
+            "팩터·산업 모멘텀은 <b>가격 추세</b>이지 자금 유입 데이터가 아니며, 학계에 알려진 뒤 약해지는 경향이 있습니다(산업 모멘텀은 2000년 이후 약화). "
+            "한국 외국인 순매수 지속은 종목 단위로 다시 봐도 확인되지 않아 <b>참고</b>로 내렸고, 국면·상대강도로 섹터를 맞히는 것도 우연 수준입니다.")
 
 
 def ai_detail():

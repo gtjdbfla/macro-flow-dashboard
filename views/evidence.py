@@ -16,32 +16,53 @@ st.markdown('<p class="lede">이 대시보드의 모든 숫자는 공개 데이�
             '아래는 그 결과입니다.</p>', unsafe_allow_html=True)
 ui.freshness(meta)
 
+T = load("views/evidence_tests.parquet")
+cond = load("views/evidence_conditions.parquet")
+k2 = load("views/korea_model_v2.parquet")
+P = T[T.primary].set_index("claim")
+
 st.header("1. 무엇이 확인됐나")
 c1, c2, c3, c4 = st.columns(4, gap="medium")
 k = ev["korea_eval"]
 with c1:
     st.markdown(badge("검증됨", "good"), unsafe_allow_html=True)
-    st.markdown(f"**미국 마감 → 다음 한국 거래일**\n\n- 시차 약 1거래일, 3일째부터 소멸\n- 모델 상관: 적합 구간 {k['train']['corr']:.2f}/{k['val']['corr']:.2f}, **표본외 {k['test']['corr']:.2f}**\n"
-                "- 미국 risk-on 뒤 외국인 순매수 확률 62~64%(평소 47~50%)\n- 효과는 거의 시가 갭에서 나옴")
+    st.markdown(f"**미국 마감 → 다음 한국 거래일**\n\n- 시차 약 1거래일, 3일째부터 소멸\n- 모델 상관: 적합 구간 {k['train']['corr']:.2f}/{k['val']['corr']:.2f}, **표본외 {k['test']['corr']:.2f}** (직전 외국인 수급 추가로 0.33에서 상승)\n"
+                "- 효과는 거의 시가 갭에서 나옴\n\n"
+                f"**팩터 모멘텀**(가격): 전체 t {P.loc['factor_momentum'].all_t:+.1f}, 세 구간 모두 +\n\n"
+                f"**산업 모멘텀**(가격): 전체 t {P.loc['industry_momentum'].all_t:+.1f}, 단 {P.loc['industry_momentum'].recent or '최근 구간 확인 필요'}")
 with c2:
     st.markdown(badge("단서", "warn"), unsafe_allow_html=True)
-    st.markdown("**약하지만 방향이 일관**\n\n- 한국 업종 외국인 60일 흐름 → 이후 20일 업종 수익(상관 약 0.07)\n- 미국 ETF 순유입 → 이후 상대수익은 낮은 경향\n- VIX가 클수록 이후 수익이 좋은 경향(가설과 반대)\n\n"
-                f"모두 전향 장부로 재검증 중({ev['ledger'].get('n_days', 0)}일째)")
+    st.markdown(f"**미국 섹터 ETF 자금이 몰리면 이후 덜 오른다**\n\n- 전체 t {P.loc['us_flow_contrarian'].all_t:+.1f}, 2005–18과 2023~은 역방향, 2019–22만 반대\n"
+                "- 평온한 시장(VIX 순위 <0.5)에서는 세 구간 모두 역방향(탐색적 분해)\n- VIX가 클수록 이후 수익이 좋은 경향(가설과 반대)\n\n"
+                f"전향 장부로 재검증 중({ev['ledger'].get('n_days', 0)}일째)")
 with c3:
-    st.markdown(badge("지지되지 않음", "bad"), unsafe_allow_html=True)
-    st.markdown(f"**매크로 국면 → 섹터·자산 수익**\n\n- 검정 {ev['regime_testable']:,}건 중 세 구간 재현 {ev['regime_replicated']}건({ev['regime_rate']*100:.1f}%, 우연 기대 약 1.25%)\n"
-                f"- 섹터 상대강도·모멘텀·자금흐름의 예측력은 구간마다 부호가 바뀜\n- 점수 구성요소 {ev['score_components']}개 중 채택 {ev['score_included']}개")
+    st.markdown(badge("참고 · 지지되지 않음", "bad"), unsafe_allow_html=True)
+    st.markdown(f"**매크로 국면 → 섹터·자산 수익**: 검정 {ev['regime_testable']:,}건 중 세 구간 재현 {ev['regime_replicated']}건({ev['regime_rate']*100:.1f}%, 우연 기대 약 1.25%)\n\n"
+                f"**한국 종목 외국인 순매수 지속**: 28종목 패널에서 어느 호라이즌도 확인 안 됨(전체 t {P.loc['kr_foreign_persistence'].all_t:+.1f})\n\n"
+                f"**미국 섹터 ETF 가격 모멘텀**(2005~): 전체 t {P.loc['us_sector_momentum'].all_t:+.1f}\n\n"
+                "**AI 투자 → 이후 매출·이익**: 시간 추세를 제거하면 근거 없음")
 with c4:
     st.markdown(badge("측정 불가", "mid"), unsafe_allow_html=True)
-    st.markdown("**무료 데이터가 없는 것**\n\n- iShares·VanEck 계열 ETF의 실제 자금유입\n- 옵션 포지셔닝, 13F, ISM\n- CDS·유통시장 채권 수익률, HBM 가격\n- 한국 반도체 수출 속보")
+    st.markdown("**무료 데이터가 없는 것**\n\n- iShares·VanEck 계열 ETF의 실제 자금유입\n- 스타일 팩터의 자금유입(가격 추세로만 확인)\n- 옵션 포지셔닝, 13F, ISM\n- CDS·유통시장 채권 수익률, HBM 가격")
 
-st.header("2. 한국 전달 모델: 예측 5분위별 실제 결과")
-q = quint.copy()
-q["period"] = q["period"].map({"fit": "적합 구간 2005-2022", "oos": "표본외 2023~"})
-st.dataframe(q.rename(columns={"period": "구간", "q": "예측 분위(Q1=가장 약세)", "days": "일수", "buy_prob": "외국인 순매수 확률%", "total_bp": "다음날 KOSPI bp",
-                               "gap_bp": "그중 시가 갭 bp", "intraday_bp": "장중 bp"}).round(1), hide_index=True, width="stretch")
-st.markdown('<p class="note">입력은 QQQ·SOXX·달러지수 일수익률과 실질금리 변화. 상위 분위일수록 외국인 순매수 확률과 다음날 KOSPI가 높지만, 상승분이 시가 갭에 몰려 있어 개장 후에 잡을 수 있는 초과수익은 확인되지 않았습니다.</p>',
+st.header("2. 등급을 어떻게 정했나 (같은 규칙으로 전부 다시 계산)")
+st.markdown("**규칙**: 세 구간에서 부호가 같고 2구간 이상 |t|≥2이며 전체 |t|≥3이면 **검증됨**, 전체 |t|≥2이고 2구간 이상 같은 부호면 **단서**, 나머지는 **참고**. "
+            "t는 Newey-West(겹치는 수익률 길이만큼), 횡단면 신호는 매 시점 스피어만 IC의 시간 평균입니다. 구간 끝의 미래 윈도우는 버립니다(purge).")
+st.markdown(ui.grade_table(T, only_primary=False), unsafe_allow_html=True)
+st.markdown('<p class="note">같은 주장을 여러 호라이즌으로 친 줄은 <b>대표 하나(사전 지정)만 등급에 쓰는</b> 표시를 둡니다. 보조 줄은 일관성 확인용이고, '
+            '예를 들어 미국 ETF 자금은 5일 후에서는 기계적으로 검증됨 기준을 넘지만 2019–22 효과가 거의 0이고 호라이즌을 사후에 고른 것이라 등급에 쓰지 않았습니다.</p>',
             unsafe_allow_html=True)
+with st.expander("미국 ETF 자금 역방향은 어떤 조건에서 맞나 (탐색적 분해 · 20일 후)"):
+    cc = cond.copy()
+    st.dataframe(pd.DataFrame({"조건": cc.condition, "2005–18 IC": cc.train_mean, "t": cc.train_t, "2019–22 IC": cc.val_mean, "t ": cc.val_t,
+                               "2023~ IC": cc.test_mean, "t  ": cc.test_t, "전체 t": cc.all_t}).round(2), hide_index=True, width="stretch")
+    st.markdown('<p class="note">조건 6개를 사후에 나눠 본 탐색입니다(다중 비교). 가장 일관된 것은 VIX 순위가 낮은 구간(세 구간 모두 음수)이며, 가설 H5로 전향 장부에 등록했습니다.</p>',
+                unsafe_allow_html=True)
+with st.expander("한국 전달 모델 입력 후보 비교 (train 적합 → val로 선택 → test 한 번)"):
+    st.dataframe(pd.DataFrame({"입력 세트": k2.set, "검증 상관": k2.val_corr, "검증 설명력": k2.val_r2, "표본외 상관": k2.test_corr, "표본외 설명력": k2.test_r2}).round(3),
+                 hide_index=True, width="stretch")
+    st.markdown('<p class="note">후보 4세트를 미리 정하고 검증 구간에서 가장 좋은 것(C: 직전 한국 외국인 수급 추가)을 골랐습니다. 외국인 수급이 하루 단위로 이어지는 성질을 반영한 것이며, '
+                '원/달러·HYG·VIX를 더한 D는 개선이 없었습니다. 표본외 설명력은 약 20%로 올랐으나 여전히 방향 힌트 수준입니다.</p>', unsafe_allow_html=True)
 
 st.header("3. AI 수익성 모듈의 신뢰도")
 st.markdown("""
@@ -64,7 +85,10 @@ if L.get("n_days"):
     rows = [("H1 미국→한국 다음 장 외국인 수급", L["h1_korea"]["n"], "n≥60에서 상관 0.2 유지"),
             ("H2 공포(VIX 상위) 뒤 SPY 20일 수익이 높다", L["h2_vix"]["n_high_fear"], "독립 사례 8건 이상"),
             ("H3 한국 업종 외국인 60일 흐름 → 20일 상대수익", L["h3_kr_sector"]["n_matured"], "비겹침 12개, IC 0.05 이상"),
-            ("H4 미국 섹터 ETF 순유입이 클수록 이후 상대수익이 낮다", L.get("h4_us_flow", {}).get("n_matured", 0), "비겹침 12개, IC −0.05 이하")]
+            ("H4 미국 섹터 ETF 순유입이 클수록 이후 상대수익이 낮다", L.get("h4_us_flow", {}).get("n_matured", 0), "비겹침 12개, IC −0.05 이하"),
+            ("H5 H4가 평온한 시장(VIX 순위<0.5)에서 더 뚜렷하다", L.get("h5_us_flow_calm", {}).get("n_matured", 0), "비겹침 12개, IC −0.05 이하"),
+            ("H6 팩터 모멘텀(5팩터 평균) 월 수익이 +", L.get("h6_factor_mom", {}).get("n_months", 0), "새로 발표된 월 12개 이상, 평균 > 0"),
+            ("H7 산업 모멘텀 IC가 +", L.get("h7_industry_mom", {}).get("n_months", 0), "새로 발표된 월 12개 이상, 평균 IC > 0")]
     st.dataframe(pd.DataFrame(rows, columns=["가설", "실현된 표본", "판정 조건"]), hide_index=True, width="stretch")
 
 st.header("5. 데이터 출처와 갱신")

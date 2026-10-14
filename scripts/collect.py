@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data import DATA_DIR, cftc, cloud, debt, fred, sec, ssga, twse, yahoo  # noqa: E402
+from src.data import DATA_DIR, cftc, cloud, debt, fred, french, sec, ssga, twse, yahoo  # noqa: E402
 from src.data.universe import CFTC, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
@@ -58,6 +58,12 @@ if not only or "ssga" in only:
         cov["ssga"]["holdings"] = ssga.collect_holdings()
     except Exception as e:
         cov["ssga"]["holdings_error"] = str(e)[:200]
+
+if not only or "french" in only:
+    try:
+        cov["french"] = {"updated": now, "series": french.collect()}
+    except Exception as e:
+        cov["french"] = {"updated": now, "series": {}, "error": str(e)[:200]}
 
 cov_path.write_text(json.dumps(cov, ensure_ascii=False, indent=1), encoding="utf-8")
 for src, v in cov.items():

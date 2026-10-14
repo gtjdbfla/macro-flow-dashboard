@@ -115,6 +115,7 @@ st.markdown(badge("검증됨", "good") + badge("표본외 2023~ 기준", "mid"),
 st.markdown(kpis([("다음 한국 거래일 외국인 수급 (z)", f"{z:+.2f}", f"미국 마감 기준 · {zdir}"),
                   ("모델 표본외 상관", f"{ev_k['corr']:.2f}", f"설명력(R²) {ev_k['r2_vs_mean']:.2f} · 방향 힌트 수준"),
                   ("예측 최상위 vs 최하위 구간", f"{q.buy_prob.iloc[-1]:.0f}% vs {q.buy_prob.iloc[0]:.0f}%", "외국인 순매수 확률 (평소 약 47%)")]), unsafe_allow_html=True)
+st.markdown('<p class="note">입력: 미국 QQQ·SOXX·달러지수·실질금리 + 직전 한국 거래일 외국인 수급(모델 v2, 2026-10-14). 직전 수급을 더해 표본외 상관이 0.33에서 0.45로 올랐습니다(근거·방법 페이지).</p>', unsafe_allow_html=True)
 k1, k2, k3 = st.columns(3, gap="large")
 with k1:
     st.markdown("**예측 5분위별 외국인 순매수 확률 (%)**")
@@ -141,16 +142,32 @@ with k3:
     plot(fig, 320, legend=False)
     st.markdown('<p class="note">업종 대표 종목 3~4개 합산(KIS). 대표 종목은 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>', unsafe_allow_html=True)
 
-st.markdown("#### 확인된 수준별 정리")
-kv = ev["korea_eval"]
-trio(
-    ev_card(badge("검증됨", "good"), "미국 마감 → 한국 다음 장", "시차 약 1일", "세 구간 모두 같은 방향, 주로 시가 갭으로 나타남",
-            [("2005–18 상관", f"{kv['train']['corr']:.2f}", ""), ("2019–22 상관", f"{kv['val']['corr']:.2f}", ""), ("2023~ 표본외 상관", f"{kv['test']['corr']:.2f}", "")]),
-    ev_card(badge("단서", "warn"), "약하지만 방향이 일관된 신호", "상관 약 0.07", "한국 업종 외국인 60일 흐름 → 이후 20일 업종 수익 (세 구간 모두 +)",
-            [("미국 ETF 순유입 → 이후 상대수익", "역방향", "약함"), ("VIX가 클수록 이후 수익", "높은 경향", "가설 반대"),
-             ("전향 장부", f"{ev['ledger'].get('n_days', 0)}일째", "재검증 중")]),
-    ev_card(badge("참고", "mid"), "섹터·국면 기반 예측은 근거 부족", f"{ev['regime_rate']*100:.1f}%", f"세 구간에서 모두 재현된 비율 (검정 {ev['regime_testable']:,}건 중 {ev['regime_replicated']}건, 우연 기대 ≈1.25%)",
-            [("섹터 상대강도·자금 신호", "구간마다 부호 변동", ""), ("점수 구성요소 채택", f"{ev['score_included']}개", f"/ {ev['score_components']}개")]))
+st.markdown("#### 다음에 몰릴 곳 — 확인된 수준별 정리")
+T = load("views/evidence_tests.parquet")
+en = load("views/evidence_now.json")
+st.markdown(ui.grade_table(T), unsafe_allow_html=True)
+st.markdown('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
+            '<b>검증됨</b> = 세 구간 같은 부호 + 2구간 이상 |t|≥2 + 전체 |t|≥3, <b>단서</b> = 전체 |t|≥2 + 2구간 이상 같은 부호, 나머지 <b>참고</b>. '
+            '호라이즌이 여럿인 주장은 사전에 정한 대표 하나만 판정에 씁니다. 이 평가는 이미 본 과거 데이터에 대한 것이고, 전향 장부에서 다시 확인합니다.</p>',
+            unsafe_allow_html=True)
+f1, f2 = st.columns(2, gap="large")
+with f1:
+    st.markdown(f"**팩터 12개월 누적 수익** ({en['asof'][:7]} 기준 · 팩터 모멘텀의 현재 신호)")
+    fv = pd.Series(en["factor_12m"]).sort_values()
+    fig = go.Figure(go.Bar(x=fv.values * 100, y=[ui.FACTOR_KO[k] for k in fv.index], orientation="h", marker_color=np.where(fv.values >= 0, "#22a55a", "#ee5555"),
+                           text=[f"{v*100:+.0f}%" for v in fv.values], textposition="outside"))
+    fig.update_xaxes(range=[min(-5, fv.min() * 100 * 1.5), max(5, fv.max() * 100 * 1.5)])
+    plot(fig, 300, legend=False)
+    st.markdown('<p class="note">12개월 누적이 +인 팩터는 다음 달에도 +일 경향(월 평균 +0.2~0.3%p). 가치·소형·수익성·투자 팩터는 롱숏 포트폴리오 수익입니다. '
+                '효과가 작고 월별로 들쭉날쭉해, 방향 힌트로만 쓰세요. 데이터는 지난달까지입니다(발표 지연).</p>', unsafe_allow_html=True)
+with f2:
+    st.markdown(f"**산업 12−1개월 모멘텀 상위·하위 5** ({en['asof'][:7]} 기준, 49개 산업)")
+    top = [(ui.IND_KO.get(k.strip(), k), v) for k, v in en["industry_top"]]
+    bot = [(ui.IND_KO.get(k.strip(), k), v) for k, v in en["industry_bottom"]]
+    rws = lambda L: "".join(f"<tr><td>{n}</td><td class='r'>{v*100:+.0f}%</td></tr>" for n, v in L)  # noqa: E731
+    st.markdown(f"<table class='mini'><tr><th>많이 오른 산업</th><th class='r'>11개월 수익</th></tr>{rws(top)}</table><div style='height:10px'></div>"
+                f"<table class='mini'><tr><th>많이 못 오른 산업</th><th class='r'>11개월 수익</th></tr>{rws(bot)}</table>", unsafe_allow_html=True)
+    st.markdown('<p class="note">1927~1999년에는 강한 규칙(t 6)이었으나 2000년 이후는 약해졌습니다(t 1.4, 같은 방향). 미국 섹터 ETF(2005~)에서는 확인되지 않았습니다.</p>', unsafe_allow_html=True)
 
 
 @st.fragment

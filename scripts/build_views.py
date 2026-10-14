@@ -90,6 +90,11 @@ ev = {"regime_testable": int(len(t)), "regime_train_sig": int(t.train_sig.sum())
       "korea_eval": summary["korea_model"]["eval"], "oos_ic": {k: v["test"]["ic"] for k, v in summary["oos_ic"].items()},
       "ledger": summary.get("ledger", {}), "score_components": int(len(pd.read_parquet(R / "score_validation.parquet"))),
       "score_included": int(pd.read_parquet(R / "score_validation.parquet").included.sum())}
+for _n in ("evidence_tests", "evidence_conditions", "korea_model_v2"):
+    if (R / f"{_n}.parquet").exists():
+        pd.read_parquet(R / f"{_n}.parquet").to_parquet(V / f"{_n}.parquet")
+if (R / "evidence_now.json").exists():
+    (V / "evidence_now.json").write_text((R / "evidence_now.json").read_text(encoding="utf-8"), encoding="utf-8")
 (V / "evidence.json").write_text(json.dumps(ev, ensure_ascii=False, default=float), encoding="utf-8")
 
 # ── 데이터 신선도 ───────────────────────────────────────────────────────────
@@ -134,6 +139,7 @@ SRC = [
     ("cloud", "클라우드 부문·AI 수치(8-K 발표문)", "분기 · 실적 발표일", 100, _pq("cloud_segments.parquet", "filed")),
     ("debt", "채권 신규 발행 조건(SEC)", "발행 시(불규칙)", 120, _pq("debt_issuance.parquet", "filed")),
     ("twse", "대만 AI 공급망 월매출", "월 1회 · 매월 10일경", 45, _pq("twse_monthly.parquet", "month")),
+    ("french", "Ken French 산업·팩터 수익률(1926~, 가격 기반)", "월 1회 · 매월 중순(지난달까지)", 80, _pq("french_ind.parquet", "index")),
 ]
 rows = []
 for key, label, cadence, tol, end in SRC:

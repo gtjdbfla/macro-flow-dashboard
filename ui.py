@@ -217,6 +217,45 @@ def holdings_table(hd, sector_order):
     return ("<table class='mini hold'><tr><th>섹터</th><th>대표 종목 (ETF 내 비중)</th><th class='r'>상위 5 합</th></tr>" + "".join(rows) + "</table>")
 
 
+GRADE_KIND = {"검증됨": "good", "단서": "warn", "참고": "mid"}
+FACTOR_KO = {"Mkt-RF": "시장", "SMB": "소형주", "HML": "가치", "RMW": "수익성(퀄리티)", "CMA": "보수적 투자", "Mom": "모멘텀"}
+IND_KO = {"Agric": "농업", "Food": "식품", "Soda": "음료", "Beer": "주류", "Smoke": "담배", "Toys": "장난감", "Fun": "오락", "Books": "출판", "Hshld": "가정용품",
+          "Clths": "의류", "Hlth": "의료서비스", "MedEq": "의료기기", "Drugs": "제약", "Chems": "화학", "Rubbr": "고무·플라스틱", "Txtls": "섬유", "BldMt": "건자재",
+          "Cnstr": "건설", "Steel": "철강", "FabPr": "금속가공", "Mach": "기계", "ElcEq": "전기장비", "Autos": "자동차", "Aero": "항공우주", "Ships": "조선",
+          "Guns": "무기", "Gold": "금", "Mines": "광업", "Coal": "석탄", "Oil": "석유가스", "Util": "유틸리티", "Telcm": "통신", "PerSv": "개인서비스",
+          "BusSv": "사업서비스", "Hardw": "컴퓨터 하드웨어", "Softw": "소프트웨어", "Chips": "반도체", "LabEq": "계측장비", "Paper": "종이", "Boxes": "용기",
+          "Trans": "운송", "Whlsl": "도매", "Rtail": "소매", "Meals": "외식", "Banks": "은행", "Insur": "보험", "RlEst": "부동산", "Fin": "기타 금융", "Other": "기타"}
+
+
+def split_rows(r, fmt="{:+.3f}", expect=None):
+    """evidence_tests 한 행 -> ev_card용 구간별 줄. expect: 기대 부호(+1/-1)가 있으면 ✓/✗ 표시."""
+    out = []
+    for k, lab in (("train", r["lab_train"]), ("val", r["lab_val"]), ("test", r["lab_test"])):
+        m, t = r[f"{k}_mean"], r[f"{k}_t"]
+        if m != m:
+            out.append((lab, "표본 부족", ""))
+            continue
+        mk = "" if expect is None else ("✓ 같은 방향" if m * expect > 0 else "✗ 반대")
+        out.append((lab, f"{fmt.format(m)}  (t {t:+.1f})", mk))
+    return out
+
+
+def grade_table(tests, only_primary=True):
+    """모든 주장의 등급표(HTML). 구간별 t를 한눈에 본다."""
+    d = tests[tests.primary] if only_primary else tests
+    names = {"us_flow_contrarian": "미국 섹터 ETF 자금이 몰리면 이후 덜 오른다(역방향)", "us_sector_momentum": "미국 섹터 ETF 가격 모멘텀(2005~)",
+             "kr_foreign_persistence": "한국 종목: 외국인이 많이 산 종목이 이후에도 더 오른다", "industry_momentum": "산업 모멘텀(49산업, 1927~)",
+             "factor_momentum": "팩터 모멘텀(시장·소형·가치·수익성·투자, 1963~)", "ai_capex_leadlag": "AI 빅테크: CAPEX가 클수록 4분기 뒤 매출이 더 는다"}
+    rows = []
+    for r in d.itertuples():
+        cells = "".join(f"<td class='r'>{getattr(r, k + '_t'):+.1f}</td>" if getattr(r, k + "_t") == getattr(r, k + "_t") else "<td class='r'>—</td>"
+                        for k in ("train", "val", "test", "all"))
+        note = (r.recent + " · " if r.recent else "") + r.why
+        rows.append(f"<tr><td>{names.get(r.claim, r.claim)}</td><td>{badge(r.grade, GRADE_KIND[r.grade])}</td>{cells}<td class='muted'>{note}</td></tr>")
+    return ("<table class='mini'><tr><th>주장</th><th>등급</th><th class='r'>1구간 t</th><th class='r'>2구간 t</th><th class='r'>3구간 t</th><th class='r'>전체 t</th><th>판정 근거</th></tr>"
+            + "".join(rows) + "</table>")
+
+
 def freshness(meta: dict):
     items = [("미국 마감", meta["us_close"]), ("한국 수급", meta["kis_last"]), ("SEC 최신 공시", meta["sec_filed"]),
              ("재무 기준 분기", meta["sec_period"]), ("대만 월매출", meta["twse_month"][:7])]
