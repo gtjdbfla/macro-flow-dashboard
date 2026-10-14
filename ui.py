@@ -1,5 +1,8 @@
-"""공통 UI: 스타일, 카드·배지, 데이터 로더(수정시각 기준 캐시), 차트 스타일.
-앱은 data/views(작은 요약)와 data/results(작은 분석 결과)만 읽는다."""
+"""공통 UI: 스타일, 요약 카드·KPI 타일·근거 카드, 데이터 로더(수정시각 기준 캐시), 차트 스타일.
+앱은 data/views(작은 요약)와 data/results(작은 분석 결과)만 읽는다.
+
+레이아웃 원칙(PC 우선): 본문 16px · 한 줄 70자 안팎 · 문단 대신 '큰 숫자 + 짧은 설명' 카드 · 같은 줄의 카드는 높이를 맞춘다 ·
+표는 잘리지 않을 폭에 둔다 · 경고·한계는 하나의 callout으로 모은다."""
 import json
 
 import plotly.graph_objects as go
@@ -9,32 +12,57 @@ from src.data import DATA_DIR
 
 CSS = """
 <style>
-.block-container{padding-top:1.2rem;padding-bottom:3rem;max-width:1320px}
-h1,h2,h3{letter-spacing:-0.01em}
-.lede{font-size:1.12rem;line-height:1.7;margin:.2rem 0 1rem}
-.muted{color:#8a99a3;font-size:.86rem}
-.b{display:inline-block;padding:2px 10px;border-radius:10px;font-size:.76rem;font-weight:700;margin-right:6px}
+html{font-size:16px}
+.block-container{max-width:1440px;padding:1.2rem 2.6rem 4rem}
+[data-testid="stMarkdownContainer"] p,[data-testid="stMarkdownContainer"] li{font-size:1rem;line-height:1.72}
+h1{font-size:2.1rem!important;margin-bottom:.2rem!important}
+h2{font-size:1.5rem!important;margin:1.6rem 0 .6rem!important}
+h3{font-size:1.2rem!important;margin:1.2rem 0 .5rem!important}
+.lede{font-size:1.08rem;line-height:1.7;margin:.1rem 0 .8rem;max-width:62rem}
+.muted,.note{color:#8a99a3;font-size:.88rem;line-height:1.6}
+.b{display:inline-block;padding:2px 10px;border-radius:10px;font-size:.78rem;font-weight:700;margin-right:6px;white-space:nowrap}
 .b.good{background:#15803d22;color:#22a55a;border:1px solid #22a55a55}
 .b.warn{background:#d9770622;color:#e08a1e;border:1px solid #e08a1e66}
 .b.bad{background:#dc262622;color:#ee5555;border:1px solid #ee555566}
 .b.mid{background:#64748b22;color:#8a99a3;border:1px solid #64748b55}
 .b.info{background:#2563eb22;color:#5b8def;border:1px solid #5b8def66}
-.card{border:1px solid #64748b44;border-radius:12px;padding:18px 20px;height:100%}
-.card h3{margin:0 0 4px;font-size:1.08rem}
-.card .head{font-size:1.02rem;line-height:1.65;margin:8px 0 14px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.stat{border-left:3px solid #64748b55;padding:2px 0 2px 10px;min-width:0}
-.stat .l{font-size:.76rem;color:#8a99a3}.stat .v{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}.stat .s{font-size:.78rem;color:#8a99a3}
-.chain{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:stretch}
-.step{border:1px solid #64748b44;border-radius:12px;padding:14px 16px;position:relative;min-width:0}
-.step .n{font-size:.74rem;color:#8a99a3;font-weight:700;letter-spacing:.06em}
-.step .t{font-size:1.02rem;font-weight:700;margin:2px 0 8px}
-.step .kv{font-size:.86rem;line-height:1.55}
+/* 요약 카드 한 쌍: grid로 높이를 맞춘다 */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:.4rem 0 1rem}
+.sum{border:1px solid #64748b44;border-radius:14px;padding:22px 26px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.sum .t{font-size:1.05rem;font-weight:700;letter-spacing:-.01em}
+.sum .head{font-size:1.14rem;line-height:1.62;font-weight:500}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:auto}
+.kpi{background:#64748b14;border-radius:10px;padding:12px 14px;min-width:0}
+.kpi .l{font-size:.8rem;color:#8a99a3}
+.kpi .v{font-size:1.5rem;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .s{font-size:.82rem;color:#8a99a3}
+/* 근거 카드(등급 배지 + 한 줄 결론 + 큰 숫자 + 구간별 줄 + 칩) */
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:.4rem 0 1rem}
+.ev{border:1px solid #64748b44;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ev .title{font-size:1.06rem;font-weight:700;line-height:1.45}
+.ev .big{font-size:2.1rem;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+.ev .bigl{font-size:.84rem;color:#8a99a3;margin-top:-6px}
+.ev .rows{display:grid;grid-template-columns:1fr auto auto;gap:3px 12px;font-size:.9rem;font-variant-numeric:tabular-nums;border-top:1px solid #64748b33;padding-top:10px}
+.ev .rows span:nth-child(3n+2),.ev .rows span:nth-child(3n){text-align:right}
+.ev .chipl{font-size:.8rem;color:#8a99a3;margin-top:4px}
+.chip{display:inline-block;padding:3px 10px;border-radius:8px;font-size:.88rem;margin:2px 6px 2px 0}
+.chip.up{background:#22a55a22;color:#3fc57a}.chip.dn{background:#ee555522;color:#f07575}.chip.nu{background:#64748b22;color:#aab6bd}
+.callout{border-left:4px solid #e08a1e;background:#e08a1e12;padding:12px 16px;border-radius:0 8px 8px 0;margin:.6rem 0 1rem;font-size:.95rem;line-height:1.65}
+.callout.info{border-left-color:#5b8def;background:#5b8def12}
+.fresh{display:flex;flex-wrap:wrap;gap:4px 22px;font-size:.84rem;color:#8a99a3;margin:.2rem 0 .6rem}
+.fresh b{color:#c0cbd2}
+.mini{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+.mini th{text-align:left;color:#8a99a3;font-weight:600;font-size:.8rem;padding:4px 8px;border-bottom:1px solid #64748b44}
+.mini td{padding:5px 8px;border-bottom:1px solid #64748b22}
+.mini td.r,.mini th.r{text-align:right}
+.chain{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}
+.step{border:1px solid #64748b44;border-radius:12px;padding:16px 18px;min-width:0}
+.step .n{font-size:.76rem;color:#8a99a3;font-weight:700;letter-spacing:.06em}
+.step .t{font-size:1.04rem;font-weight:700;margin:2px 0 8px}
+.step .kv{font-size:.9rem;line-height:1.6}
 .step.good{border-top:3px solid #22a55a}.step.warn{border-top:3px solid #e08a1e}.step.bad{border-top:3px solid #ee5555}.step.mid{border-top:3px solid #64748b}
-.fresh{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:#8a99a3;margin:.3rem 0 1rem}
-.note{font-size:.84rem;color:#8a99a3;line-height:1.6}
 div[data-testid="stMetricValue"]{font-size:1.6rem}
-@media (max-width:1000px){.stats{grid-template-columns:1fr}.chain{grid-template-columns:1fr 1fr}}
+@media (max-width:1100px){.duo,.trio,.chain{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
 </style>
 """
 
@@ -82,22 +110,48 @@ def load_parquet_dir(rel: str):
 
 def fig_style(fig: go.Figure, h: int = 300, legend=True) -> go.Figure:
     fig.update_layout(height=h, margin=dict(l=0, r=0, t=8, b=0), showlegend=legend,
-                      legend=dict(orientation="h", y=1.14, x=0), hovermode="x unified",
-                      font=dict(size=12))
+                      legend=dict(orientation="h", y=1.14, x=0), hovermode="x unified", font=dict(size=13))
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(gridcolor="rgba(100,116,139,0.18)", zeroline=False)
     return fig
 
 
 def plot(fig: go.Figure, h: int = 300, legend=True, key=None):
-    st.plotly_chart(fig_style(fig, h, legend), width="stretch", key=key,
-                    config={"displayModeBar": False, "responsive": True})
+    st.plotly_chart(fig_style(fig, h, legend), width="stretch", key=key, config={"displayModeBar": False, "responsive": True})
 
 
-def card(title: str, badge_html: str, headline: str, stats: list):
-    s = "".join(f'<div class="stat"><div class="l">{l}</div><div class="v">{v}</div><div class="s">{sub}</div></div>' for l, v, sub in stats)
-    st.markdown(f'<div class="card"><h3>{title}</h3>{badge_html}<div class="head">{headline}</div><div class="stats">{s}</div></div>',
-                unsafe_allow_html=True)
+def kpis(items):
+    """[(라벨, 값, 보조)] -> KPI 타일 HTML."""
+    return '<div class="kpis">' + "".join(
+        f'<div class="kpi"><div class="l">{l}</div><div class="v">{v}</div><div class="s">{s}</div></div>' for l, v, s in items) + "</div>"
+
+
+def summary_card(title, badges, headline, items):
+    return (f'<div class="sum"><div><span class="t">{title}</span></div><div>{badges}</div>'
+            f'<div class="head">{headline}</div>{kpis(items)}</div>')
+
+
+def duo(a: str, b: str):
+    st.markdown(f'<div class="duo">{a}{b}</div>', unsafe_allow_html=True)
+
+
+def ev_card(badge_html, title, big, big_label, rows, chips_html=""):
+    """rows: [(라벨, 값, 표시)] — 구간별 결과 줄. chips_html: 후보 칩."""
+    r = "".join(f"<span>{a}</span><span>{b}</span><span>{c}</span>" for a, b, c in rows)
+    return (f'<div class="ev"><div>{badge_html}</div><div class="title">{title}</div><div class="big">{big}</div>'
+            f'<div class="bigl">{big_label}</div><div class="rows">{r}</div>{chips_html}</div>')
+
+
+def trio(a, b, c):
+    st.markdown(f'<div class="trio">{a}{b}{c}</div>', unsafe_allow_html=True)
+
+
+def chips(label, names, kind):
+    return f'<div class="chipl">{label}</div><div>' + "".join(f'<span class="chip {kind}">{n}</span>' for n in names) + "</div>"
+
+
+def callout(text, kind=""):
+    st.markdown(f'<div class="callout {kind}">{text}</div>', unsafe_allow_html=True)
 
 
 def freshness(meta: dict):

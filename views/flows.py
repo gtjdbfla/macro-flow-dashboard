@@ -6,7 +6,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 import ui
-from ui import badge, load, plot
+from ui import badge, ev_card, kpis, load, plot, trio
 
 S = load("results/summary.json")
 sec = load("results/sector_snapshot.parquet")
@@ -67,37 +67,38 @@ with st.expander("산업·테마 ETF (반도체·은행·바이오·방산 등)"
 st.header("2. 한국으로의 전달 — 통계로 확인된 유일한 연결")
 last = kh.dropna(subset=["pred_foreign_z"]).iloc[-1]
 z = float(last.pred_foreign_z)
-k1, k2, k3 = st.columns([1.1, 1.2, 1.1], gap="large")
+zdir = "순매수 쪽" if z > 0.15 else ("순매도 쪽" if z < -0.15 else "중립")
+q = quint[quint.period == "oos"]
+ev_k = ev["korea_eval"]["test"]
+st.markdown(badge("검증됨", "good") + badge("표본외 2023~ 기준", "mid"), unsafe_allow_html=True)
+st.markdown(kpis([("다음 한국 거래일 외국인 수급 (z)", f"{z:+.2f}", f"미국 마감 기준 · {zdir}"),
+                  ("모델 표본외 상관", f"{ev_k['corr']:.2f}", f"설명력(R²) {ev_k['r2_vs_mean']:.2f} · 방향 힌트 수준"),
+                  ("예측 최상위 vs 최하위 구간", f"{q.buy_prob.iloc[-1]:.0f}% vs {q.buy_prob.iloc[0]:.0f}%", "외국인 순매수 확률 (평소 약 47%)")]), unsafe_allow_html=True)
+k1, k2, k3 = st.columns(3, gap="large")
 with k1:
-    ev_k = ev["korea_eval"]["test"]
-    st.markdown(badge("검증됨", "good") + badge(f"표본외 상관 {ev_k['corr']:.2f}", "mid"), unsafe_allow_html=True)
-    st.metric("미국 마감 → 다음 한국 거래일 외국인 수급(z)", f"{z:+.2f}", "순매수 쪽" if z > 0.15 else ("순매도 쪽" if z < -0.15 else "중립"))
-    q = quint[quint.period == "oos"]
-    fig = go.Figure(go.Bar(x=q.q, y=q.buy_prob, marker_color="#5b8def", text=[f"{v:.0f}%" for v in q.buy_prob], textposition="outside"))
+    st.markdown("**예측 5분위별 외국인 순매수 확률 (%)**")
+    fig = go.Figure(go.Bar(x=["Q1 약세", "Q2", "Q3", "Q4", "Q5 강세"], y=q.buy_prob, marker_color="#5b8def", text=[f"{v:.0f}%" for v in q.buy_prob], textposition="outside"))
     fig.update_yaxes(range=[0, 80])
-    plot(fig, 210, legend=False)
-    st.markdown('<p class="note">2023년 이후 실제 결과. 예측값 5분위 중 가장 높은 구간은 외국인 순매수 확률이 약 60%, 가장 낮은 구간은 약 25%였습니다. '
-                '설명력은 크지 않아 방향 힌트로만 쓰세요.</p>', unsafe_allow_html=True)
+    plot(fig, 320, legend=False)
+    st.markdown('<p class="note">2023년 이후 실제 결과. 예측값이 높은 구간일수록 순매수 확률이 높습니다.</p>', unsafe_allow_html=True)
 with k2:
-    st.markdown("**KOSPI 투자자별 순매수 누적** (최근 120거래일, 조원)")
+    st.markdown("**KOSPI 투자자별 순매수 누적 (최근 120거래일, 조원)**")
     d = kr_inv.tail(120)
     fig = go.Figure()
     for col, nm in [("frgn_ntby_tr_pbmn", "외국인"), ("orgn_ntby_tr_pbmn", "기관"), ("prsn_ntby_tr_pbmn", "개인")]:
         fig.add_scatter(x=d.index, y=(d[col] / 1e6).cumsum(), name=nm, mode="lines")
-    plot(fig, 300)
+    plot(fig, 320)
     gp = quint[quint.period == "oos"]
-    st.markdown(f'<p class="note"><b>중요</b>: 미국 신호가 맞히는 다음날 KOSPI 수익은 거의 시가 갭입니다(2023년 이후 상위−하위 5분위 차이 '
-                f'{gp.total_bp.iloc[-1]-gp.total_bp.iloc[0]:.0f}bp 중 갭 {gp.gap_bp.iloc[-1]-gp.gap_bp.iloc[0]:.0f}bp). 개장 후 추가 초과수익은 확인되지 않았습니다.</p>',
-                unsafe_allow_html=True)
+    st.markdown(f'<p class="note">미국 신호가 맞히는 다음날 KOSPI 수익은 거의 시가 갭입니다(상위−하위 {gp.total_bp.iloc[-1]-gp.total_bp.iloc[0]:.0f}bp 중 갭 '
+                f'{gp.gap_bp.iloc[-1]-gp.gap_bp.iloc[0]:.0f}bp). 개장 후 추가 초과수익은 확인되지 않았습니다.</p>', unsafe_allow_html=True)
 with k3:
-    st.markdown("**한국 업종별 외국인 순매수 비중** (20일, 거래대금 대비 %)")
+    st.markdown("**한국 업종별 외국인 순매수 비중 (20일, 거래대금 대비 %)**")
     ks = kr_sec.sort_values("foreign_20d")
     fig = go.Figure(go.Bar(x=ks.foreign_20d, y=ks.sector, orientation="h", marker_color=np.where(ks.foreign_20d >= 0, "#22a55a", "#ee5555"),
                            text=[f"{v:+.1f}" for v in ks.foreign_20d], textposition="outside"))
-    fig.update_xaxes(range=[min(-1, ks.foreign_20d.min() * 1.35), max(1, ks.foreign_20d.max() * 1.35)])
-    plot(fig, 300, legend=False)
-    st.markdown('<p class="note">업종 대표 종목 3~4개 합산(KIS). 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>', unsafe_allow_html=True)
-
+    fig.update_xaxes(range=[min(-1, ks.foreign_20d.min() * 1.4), max(1, ks.foreign_20d.max() * 1.4)])
+    plot(fig, 320, legend=False)
+    st.markdown('<p class="note">업종 대표 종목 3~4개 합산(KIS). 대표 종목은 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>', unsafe_allow_html=True)
 
 # ── 과거 ────────────────────────────────────────────────────────────────────
 @st.fragment
@@ -127,20 +128,15 @@ history()
 
 # ── 앞으로 ──────────────────────────────────────────────────────────────────
 st.header("4. 앞으로 — 확인된 수준별로 구분")
-g1, g2, g3 = st.columns(3, gap="medium")
-with g1:
-    st.markdown(badge("검증됨", "good") + "**미국 마감 → 한국 다음 장**", unsafe_allow_html=True)
-    st.markdown("2절의 연결입니다. 시차 약 1거래일, 세 개 구간(2005-18 · 2019-22 · 2023~) 모두 같은 방향이었습니다. 주로 시가 갭으로 나타납니다.")
-with g2:
-    st.markdown(badge("단서", "warn") + "**약하지만 일관된 신호**", unsafe_allow_html=True)
-    st.markdown("- 한국 업종 외국인 60일 순매수 비중이 높을수록 이후 20일 업종 수익이 높은 경향(상관 약 0.07, 세 구간 모두 +)\n"
-                "- 미국 섹터 ETF에 자금이 많이 들어온 뒤 이후 수익이 낮은 경향(역방향)\n"
-                f"- 위 가설들은 앞으로 쌓이는 데이터로 다시 검증 중(전향 장부 {ev['ledger'].get('n_days', 0)}일째)")
-with g3:
-    st.markdown(badge("참고", "mid") + "**섹터·레짐 기반 예측은 근거 부족**", unsafe_allow_html=True)
-    st.markdown(f"매크로 국면별 섹터 초과수익은 검정 {ev['regime_testable']:,}건 중 세 구간에서 모두 재현된 것이 {ev['regime_replicated']}건"
-                f"({ev['regime_rate']*100:.1f}%)으로 우연 수준입니다. 섹터 상대강도·자금 신호의 예측력도 구간마다 부호가 바뀝니다.")
-
+kv = ev["korea_eval"]
+trio(
+    ev_card(badge("검증됨", "good"), "미국 마감 → 한국 다음 장", "시차 약 1일", "세 구간 모두 같은 방향, 주로 시가 갭으로 나타남",
+            [("2005–18 상관", f"{kv['train']['corr']:.2f}", ""), ("2019–22 상관", f"{kv['val']['corr']:.2f}", ""), ("2023~ 표본외 상관", f"{kv['test']['corr']:.2f}", "")]),
+    ev_card(badge("단서", "warn"), "약하지만 방향이 일관된 신호", "상관 약 0.07", "한국 업종 외국인 60일 흐름 → 이후 20일 업종 수익 (세 구간 모두 +)",
+            [("미국 ETF 순유입 → 이후 상대수익", "역방향", "약함"), ("VIX가 클수록 이후 수익", "높은 경향", "가설 반대"),
+             ("전향 장부", f"{ev['ledger'].get('n_days', 0)}일째", "재검증 중")]),
+    ev_card(badge("참고", "mid"), "섹터·국면 기반 예측은 근거 부족", f"{ev['regime_rate']*100:.1f}%", f"세 구간에서 모두 재현된 비율 (검정 {ev['regime_testable']:,}건 중 {ev['regime_replicated']}건, 우연 기대 ≈1.25%)",
+            [("섹터 상대강도·자금 신호", "구간마다 부호 변동", ""), ("점수 구성요소 채택", f"{ev['score_included']}개", f"/ {ev['score_components']}개")]))
 
 @st.fragment
 def analog():
