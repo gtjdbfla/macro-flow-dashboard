@@ -40,11 +40,19 @@ def record(summary: dict) -> bool:
     rec = {"date": asof, "korea_pred_z": float(kh.loc[d, "pred_foreign_z"]) if d in kh.index else None,
            "vix_rank": _f(risk.loc[d, "risk__VIX__level_rank"]), "regime": state.loc[d, "regime"],
            "kr_foreign_ratio_60d": {s: _f(kor.loc[d, f"kr__{s}_foreign__ratio_60d"]) for s in KR_ETF},
+           "ai_flags": _ai_flags(),
            "us_flow_20d": {t: _f(sec.loc[d, f"sector__{lab}__flow_20d"]) for t, lab in US_SECTORS.items()}}
     LEDGER.parent.mkdir(exist_ok=True)
     with LEDGER.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return True
+
+
+def _ai_flags():
+    p = DATA_DIR / "results" / "ai_flags.json"
+    if not p.exists():
+        return None
+    return {f["id"]: f["level"] for f in json.loads(p.read_text(encoding="utf-8"))["flags"]}
 
 
 def _f(v):

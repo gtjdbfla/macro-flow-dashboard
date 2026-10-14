@@ -90,4 +90,15 @@ def build(summary: dict) -> list:
                "미국 신호보다 외국인이 **더 강하게** 반응(매수 우위 쪽 괴리)" if r20 > 0.5 else "역사적 전달 패턴을 대체로 따름")
     out.append({"q": "⑤ 한국은 그 패턴을 따라가나, 괴리가 있나?", "grade": "검증",
                 "text": f"최근 20거래일 평균 잔차 {r20:+.2f}σ → {verdict}."})
+    ai_p = R / "ai_flags.json"
+    ai_t = R / "ai_latest.parquet"
+    if ai_p.exists() and ai_t.exists():
+        b4 = pd.read_parquet(ai_t).query("ticker == 'BIG4'").iloc[0]
+        flags_ai = {f["id"]: f for f in json.loads(ai_p.read_text(encoding="utf-8"))["flags"]}
+        warn = [f["title"] for f in flags_ai.values() if f["level"] in ("경고", "주의")]
+        out.append({"q": "⑥ AI 투자는 수익으로 돌아오고 있나?", "grade": "참고",
+                    "text": "Big4 CAPEX는 최근 12개월 %s억 달러(%+.0f%%)로 늘었는데 매출 %+.0f%%, 영업이익 %+.0f%%, 잉여현금흐름은 전년 대비 %s억 달러. "
+                            "경고·주의 신호: %s. 반면 수요 측(수주잔고·NVIDIA 매출)은 강함. ※ 회사 전체 재무 기준, AI 전용 수치 아님."
+                            % (format(b4.capex_ttm / 1e8, ',.0f'), b4.capex_yoy * 100, b4.rev_yoy * 100, b4.opinc_yoy * 100, format(b4.fcf_chg / 1e8, '+,.0f'),
+                               ", ".join(warn) if warn else "없음")})
     return out

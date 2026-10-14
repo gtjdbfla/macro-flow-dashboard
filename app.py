@@ -51,6 +51,9 @@ state_hist = feat("state").dropna(subset=["state_key"])
 state = state_hist.iloc[-1]
 
 
+NAMES_AI = {"MSFT": "Microsoft", "GOOGL": "Alphabet", "ORCL": "Oracle", "CRWV": "CoreWeave"}
+
+
 def arrow(label, up, down):
     return "↑" if label == up else ("↓" if label == down else "→")
 
@@ -61,6 +64,99 @@ for it in S.get("briefing", []):
     tag = '<span class="badge ok">검증</span>' if it["grade"] == "검증" else '<span class="badge no">참고용</span>'
     st.markdown(f"**{it['q']}** {tag}<br>{it['text']}", unsafe_allow_html=True)
 st.caption("위 문장은 계산값을 그대로 옮긴 요약입니다. '참고용'은 예측력이 확인되지 않은 현재 위치 설명입니다.")
+st.divider()
+
+# ───────────────────────── AI PROFITABILITY ─────────────────────────
+st.header("AI PROFITABILITY")
+st.caption("질문: AI 투자(CAPEX)가 실제 이익·현금흐름으로 돌아오고 있는가? · SEC 공시(분기, 공시일 기준) · 회사 전체 재무이며 AI 전용 수치가 아님(신뢰 등급 C, 수주잔고 RPO만 B)")
+_al, _ah, _af = rd("ai_latest.parquet"), rd("ai_history.parquet"), None
+_p = R / "ai_flags.json"
+if _p.exists():
+    _af = json.loads(_p.read_text(encoding="utf-8"))
+if _al is not None and _af is not None:
+    _b = _al[_al.ticker == "BIG4"].iloc[0]
+    st.markdown(
+        f"**Big4(MSFT·GOOGL·AMZN·META) 합계, 최근 12개월({_b.period_end.date()} 분기까지)**: CAPEX **{_b.capex_ttm/1e8:,.0f}억 달러 ({_b.capex_yoy*100:+.0f}%)** · "
+        f"매출 {_b.rev_yoy*100:+.0f}% · 영업이익 {_b.opinc_yoy*100:+.0f}% · 영업현금흐름 {_b.ocf_ttm/1e8:,.0f}억 달러 · "
+        f"잉여현금흐름 {_b.fcf_ttm/1e8:,.0f}억 달러 (전년 대비 {_b.fcf_chg/1e8:+,.0f}억 달러). CAPEX가 영업현금흐름의 {_b.capex_ocf*100:.0f}%를 차지.")
+    LV = {"경고": "no", "주의": "no", "긍정": "ok", "강함": "ok", "중립": "no", "정상": "ok", "일치": "ok", "둔화": "no"}
+    for f in _af["flags"]:
+        cls = LV.get(f["level"], "no" if "괴리" in f["level"] else "ok")
+        st.markdown(f'<span class="badge {cls}">{f["level"]}</span> **{f["title"]}** — {f["text"]}', unsafe_allow_html=True)
+    st.caption(f"규칙·임계값은 docs/AI_PROFITABILITY.md에 사전 고정(수익률 보고 고르지 않음). 최신 공시 반영: {_af['latest_filed']}")
+
+    def _fmt_g(v):
+        return "—" if v != v else f"{v*100:+.0f}%"
+    t = _al.copy()
+    t["op_yoy_txt"] = [("적자" if (r.get("op_margin", 0) or 0) < 0 else _fmt_g(r.opinc_yoy)) for _, r in t.iterrows()]
+    is_nv = t.ticker == "NVDA"
+    t.loc[is_nv, ["capex_ocf", "rev_per_capex", "opinc_per_capex", "rpo", "rpo_yoy"]] = np.nan  # NVIDIA는 투자 주체가 아니라 수취자
+    show = pd.DataFrame({
+        "회사": t["name"], "기준 분기": t.period_end.dt.strftime("%Y-%m"), "CAPEX TTM $B": t.capex_ttm / 1e9,
+        "CAPEX YoY%": t.capex_yoy * 100, "매출 YoY%": t.rev_yoy * 100, "영업이익 YoY": t.op_yoy_txt,
+        "FCF TTM $B": t.fcf_ttm / 1e9, "FCF 변화 $B": t.fcf_chg / 1e9, "CAPEX/OCF": t.capex_ocf,
+        "영업이익률%": t.op_margin * 100, "투자회수(영업이익Δ/CAPEX)": t.opinc_per_capex,
+        "RPO $B": t.rpo / 1e9, "RPO YoY%": t.rpo_yoy * 100})
+    st.dataframe(show.round(1), hide_index=True, width="stretch")
+    st.caption("CAPEX YoY%·매출 YoY%는 최근 12개월(TTM) 기준. 투자회수 = (영업이익 TTM − 1년 전)÷1년 전 CAPEX TTM. "
+               "NVIDIA는 투자의 수취자라 CAPEX 효율 열을 비움. 적자 기업의 영업이익 증가율은 '적자'로 표기. RPO 미공시(AMZN·META)는 —.")
+    if _ah is not None:
+        bh = _ah[(_ah.ticker == "BIG4") & (_ah.period_end >= "2016-01-01")].dropna(subset=["capex_yoy"])
+        tabs = st.tabs(["성장률 비교", "현금 전환", "투자 회수", "수주잔고(RPO)", "최근 5분기 추세"])
+        with tabs[0]:
+            fig = go.Figure()
+            for c, n in [("capex_yoy", "CAPEX"), ("rev_yoy", "매출"), ("opinc_yoy", "영업이익"), ("ocf_yoy", "영업현금흐름")]:
+                fig.add_scatter(x=bh.period_end, y=bh[c] * 100, name=n, mode="lines+markers")
+            fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="TTM YoY (%)", legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig, width="stretch")
+            st.caption("Big4 합계. CAPEX 성장률이 매출·이익 성장률을 크게 앞서는 구간이 투자 선행, 회수 대기 상태.")
+        with tabs[1]:
+            fig = go.Figure()
+            fig.add_bar(x=bh.period_end, y=bh.ocf_ttm / 1e9, name="영업현금흐름 TTM", opacity=.55)
+            fig.add_bar(x=bh.period_end, y=bh.capex_ttm / 1e9, name="CAPEX TTM", opacity=.55)
+            fig.add_scatter(x=bh.period_end, y=bh.fcf_ttm / 1e9, name="FCF TTM", mode="lines+markers")
+            fig.update_layout(barmode="group", height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="$B",
+                              legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig, width="stretch")
+        with tabs[2]:
+            fig = go.Figure()
+            fig.add_scatter(x=bh.period_end, y=bh.opinc_per_capex, name="영업이익 증가 ÷ 1년 전 CAPEX", mode="lines+markers")
+            fig.add_scatter(x=bh.period_end, y=bh.rev_per_capex, name="매출 증가 ÷ 1년 전 CAPEX", mode="lines+markers")
+            fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="$ per $", legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig, width="stretch")
+            st.caption("1년 전 CAPEX 1달러가 이후 1년간 늘린 연 매출·영업이익. 낮아질수록 투자 회수 속도 둔화(비AI 사업 포함).")
+        with tabs[3]:
+            fig = go.Figure()
+            for tk in ("MSFT", "GOOGL", "ORCL", "CRWV"):
+                r = _ah[(_ah.ticker == tk) & (_ah.period_end >= "2022-01-01")].dropna(subset=["rpo"])
+                if len(r):
+                    fig.add_scatter(x=r.period_end, y=r.rpo / 1e9, name=NAMES_AI.get(tk, tk), mode="lines+markers")
+            fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="RPO $B", legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig, width="stretch")
+            st.caption("RPO=계약으로 확정됐지만 아직 매출로 잡히지 않은 금액(수주잔고). 클라우드 수요의 선행 지표(등급 B). 일부는 특정 AI 고객 계약 집중 가능성.")
+        with tabs[4]:
+            last5 = bh.tail(5).copy()
+            tr = pd.DataFrame({"분기": last5.period_end.dt.strftime("%Y-%m"), "CAPEX YoY%": last5.capex_yoy * 100,
+                               "매출 YoY%": last5.rev_yoy * 100, "영업이익 YoY%": last5.opinc_yoy * 100,
+                               "CAPEX/OCF": last5.capex_ocf, "FCF 마진%": last5.fcf_margin * 100,
+                               "투자회수": last5.opinc_per_capex}).set_index("분기")
+            st.dataframe(tr.round(2), width="stretch")
+            st.caption("절대 수준보다 방향이 중요합니다: CAPEX/OCF 상승, FCF 마진 하락, 투자회수 하락이 함께 나타나면 회수 압박.")
+    ev = rd("ai_event_study.parquet")
+    with st.expander("이 지표는 주가를 예측했나? — 과거 분기별 이벤트 스터디와 한계"):
+        if ev is not None:
+            q = ev[(ev.split == "all") & (ev.h == 20) & ev.asset.isin(["SOXX", "NVDA", "000660.KS"]) &
+                   ev.cond.isin(["capex_accelerating", "capex_decelerating", "fcf_rising", "fcf_falling", "revenue_accelerating"])]
+            qq = pd.DataFrame({"조건(Big4 실적 공시일 기준)": q.cond, "자산": q.asset, "독립 사례": q.n_eff,
+                               "이후 20일 평균%": q["mean"] * 100, "무조건 대비%p": q.excess * 100,
+                               "CI 하단": q.ci_lo * 100, "CI 상단": q.ci_hi * 100})
+            st.dataframe(qq.round(1), hide_index=True, width="stretch")
+        st.markdown("""
+- 2014-09~ 약 30개 분기 이벤트(독립 사례 4~19개). **CAPEX 가속/감속은 반도체 주가를 구분해 예측하지 못했다**(신뢰구간 대부분 0 포함).
+- 매출 가속·FCF 증가 분기 뒤 NVDA·SOXX가 높았지만 실적 시즌 효과와 구분되지 않고 표본이 작다 → **점수에 반영하지 않고** 전향 장부(H5)로 검증.
+- 이 모듈의 가치는 예측이 아니라 **AI 투자가 수익으로 돌아오는 속도의 현재 상태와 방향을 보는 것**. 종합 점수는 가중치를 검증할 표본(AI 시대 12분기)이 없어 만들지 않았다.
+- 한계: ① AI 전용 매출·CAPEX가 아님(비AI 사업 혼합), ② 리스·자본화 방식 차이로 CAPEX 정의가 회사별로 다름, ③ 클라우드 부문 매출·가이던스는 아직 미포함(다음 단계), ④ 신용 지표(CDS·신규 발행금리)·HBM ASP는 무료 데이터 없음.
+""")
 st.divider()
 
 # ───────────────────────── 1. GLOBAL MARKET REGIME ─────────────────────────
