@@ -8,6 +8,13 @@ set -e
 cd "$(dirname "$0")"
 mkdir -p logs data
 
+# 일일 파이프라인(scripts/run_daily.py)이 같은 잠금을 잡고 있으면 재빌드로 실행 중인 컨테이너를 끊지 않도록 이번 회차는 건너뛴다(30분 뒤 재시도).
+exec 9>logs/.lock
+if ! flock -n 9; then
+    echo "$(date '+%F %T') 일일 갱신 실행 중 - 배포 건너뜀"
+    exit 0
+fi
+
 LOG=logs/deploy.log
 if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 4000 ]; then
     tail -n 2000 "$LOG" > "$LOG.keep" && cat "$LOG.keep" > "$LOG"

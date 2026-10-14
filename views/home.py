@@ -20,6 +20,14 @@ st.title("Macro & Capital Flow")
 st.markdown('<p class="lede">월가의 자금이 어디에 있고 어디로 움직여 왔는지, 그리고 AI 기업의 수익성이 어떻게 변하고 있는지를 데이터로 봅니다. '
             '앞날을 맞히는 도구가 아니라, 확인된 것과 아직 확인되지 않은 것을 구분해서 보여주는 현황판입니다.</p>', unsafe_allow_html=True)
 ui.freshness(meta)
+stt = load("status.json")
+if stt is not None:
+    import datetime as _dt
+    _age = (_dt.datetime.now(_dt.timezone.utc) - _dt.datetime.fromisoformat(stt["finished"])).total_seconds() / 3600
+    if not stt["ok"]:
+        st.warning("자동 갱신에 문제가 있습니다: " + "; ".join(stt["warnings"])[:300] + " (자세한 내용: 근거·방법 페이지)")
+    elif _age > 72:
+        st.warning(f"자동 갱신이 {_age/24:.0f}일 전 이후 실행되지 않았습니다. 서버 크론을 확인하세요.")
 st.caption(f"시장 상태: {state['regime']} 국면(성장 {'가속' if state['growth']=='Accelerating' else '둔화'}, 물가 "
            f"{'가속' if state['inflation']=='Accelerating' else '둔화'}) · 정책 {state['policy']} · 유동성 {state['liquidity']} · 달러 {state['dollar']}"
            f" — {state['days_in_regime']}거래일째 유지")
