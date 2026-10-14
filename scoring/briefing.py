@@ -98,10 +98,11 @@ def build(summary: dict) -> list:
         cl = pd.read_parquet(R / "ai_cloud_agg.parquet").iloc[-1] if (R / "ai_cloud_agg.parquet").exists() else None
         demand = ("클라우드 3사 합계 매출 %+.0f%%(영업이익률 %.0f%%, 전년 %.0f%%), " % (cl.yoy * 100, cl.margin * 100, cl.margin_prior * 100)
                   if cl is not None else "") + ("수요 측 신호 " + ", ".join(flags_ai[i]["title"] + " " + flags_ai[i]["level"] for i in ("F4", "F6", "F8") if i in flags_ai) + ".")
+        credit_txt = " ".join(flags_ai[i]["title"] + " " + flags_ai[i]["level"] + "." for i in ("F9", "F10") if i in flags_ai)
         warn = [f["title"] for f in flags_ai.values() if f["level"] in ("경고", "주의")]
         out.append({"q": "⑥ AI 투자는 수익으로 돌아오고 있나?", "grade": "참고",
                     "text": "Big4 CAPEX는 최근 12개월 %s억 달러(%+.0f%%)로 늘었는데 매출 %+.0f%%, 영업이익 %+.0f%%, 잉여현금흐름은 전년 대비 %s억 달러. "
-                            "경고·주의 신호: %s. 반면 수요 측은 강함: %s ※ 회사 전체 재무 기준(클라우드 부문 제외), AI 전용 수치 아님."
+                            "경고·주의 신호: %s. 반면 수요 측은 강함: %s 금융환경: %s ※ 회사 전체 재무 기준(클라우드 부문 제외), AI 전용 수치 아님."
                             % (format(b4.capex_ttm / 1e8, ',.0f'), b4.capex_yoy * 100, b4.rev_yoy * 100, b4.opinc_yoy * 100, format(b4.fcf_chg / 1e8, '+,.0f'),
-                               ", ".join(warn) if warn else "없음", demand)})
+                               ", ".join(warn) if warn else "없음", demand, credit_txt or "데이터 없음")})
     return out

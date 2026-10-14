@@ -103,7 +103,7 @@ if _al is not None and _af is not None:
     if _ah is not None:
         bh = _ah[(_ah.ticker == "BIG4") & (_ah.period_end >= "2016-01-01")].dropna(subset=["capex_yoy"])
         tabs = st.tabs(["클라우드(AWS·Azure·GCP)", "성장률 비교", "현금 전환", "투자 회수", "수주잔고(RPO)", "최근 5분기 추세",
-                        "대만 공급망 월매출", "AI 매출 직접 공개(A)"])
+                        "대만 공급망 월매출", "AI 매출 직접 공개(A)", "AI 투자 신용(신규 발행)"])
         with tabs[1]:
             fig = go.Figure()
             for c, n in [("capex_yoy", "CAPEX"), ("rev_yoy", "매출"), ("opinc_yoy", "영업이익"), ("ocf_yoy", "영업현금흐름")]:
@@ -193,6 +193,27 @@ if _al is not None and _af is not None:
                              hide_index=True, width="stretch")
                 st.caption("등급 A: 회사가 직접 공개한 AI 관련 정량 수치(연환산 매출, 사용량 등). 비표준 지표라 시계열로 합치지 않고 원문 그대로 보여준다. "
                            "정량 지표와 경영진 발언·전망(감성)은 섞지 않는다.")
+        with tabs[8]:
+            sp, iss = rd("ai_credit_spreads.parquet"), rd("ai_credit_issuance.parquet")
+            if sp is not None and iss is not None:
+                bk = st.radio("만기 구간", ["10Y", "5Y", "30Y"], horizontal=True, label_visibility="collapsed")
+                sq = sp[(sp.bucket == bk) & (sp.filed >= "2022-01-01")]
+                fig = go.Figure()
+                for tk, g in sq.groupby("ticker"):
+                    fig.add_scatter(x=g.filed, y=g.spread_bp, name=tk, mode="lines+markers",
+                                    text=g.currency, hovertemplate="%{x|%Y-%m-%d} %{y:.0f}bp (%{text})")
+                fig.update_layout(height=300, margin=dict(l=0, r=0, t=8, b=0), yaxis_title=f"{bk} 신규 발행 스프레드 (bp, 벤치마크 대비)",
+                                  legend=dict(orientation="h", y=1.18))
+                st.plotly_chart(fig, width="stretch")
+                rec = iss[iss.filed >= iss.filed.max() - pd.Timedelta(days=400)].sort_values("filed", ascending=False).head(24)
+                st.dataframe(pd.DataFrame({
+                    "발행사": rec.ticker, "발행일(공시)": rec.filed.dt.strftime("%Y-%m-%d"), "통화": rec.currency,
+                    "쿠폰%": rec.coupon, "만기": rec.maturity_year.astype("Int64"), "스프레드 bp": rec.spread_bp,
+                    "수익률%": rec.ytm, "규모(십억)": rec.amount / 1e9}).round(2), hide_index=True, width="stretch")
+                st.caption("SEC FWP(최종 조건표)·8-K를 파싱한 신규 발행 조건. 스프레드는 벤치마크(UST/Gilt/Bund) 대비라 통화가 달라도 비교 가능하고, "
+                           "빅테크는 투자적격(AA~A), CoreWeave는 HY라 수준 비교는 무의미하고 같은 발행사의 시계열 변화를 본다. "
+                           "발행이 없는 기간은 빈칸(유통시장 CDS·수익률은 무료 데이터 없음). CoreWeave는 대출(DDTL) 설비를 제외한 채권만, 추가 발행분은 미반영. "
+                           "파싱 실패 문서는 값을 만들지 않았다.")
     ev = rd("ai_event_study.parquet")
     with st.expander("이 지표는 주가를 예측했나? — 과거 분기별 이벤트 스터디와 한계"):
         if ev is not None:

@@ -8,6 +8,7 @@ import pandas as pd  # noqa: E402
 
 from backtest import ai_capex_event  # noqa: E402
 from src.ai import cloud as C  # noqa: E402
+from src.ai import credit as CR  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
 from src.data.yahoo import _fname  # noqa: E402
@@ -35,7 +36,18 @@ C.latest(ch, co).to_parquet(out / "ai_cloud_latest.parquet")
 C.aggregate(ch).reset_index().to_parquet(out / "ai_cloud_agg.parquet")
 tw_f = PARQUET / "twse_monthly.parquet"
 tw = pd.read_parquet(tw_f) if tw_f.exists() else None
-fl = sorted(fl + C.flags(ch, tw), key=lambda f: f["id"])
+dbt_f = PARQUET / "debt_issuance.parquet"
+cr_fl = []
+if dbt_f.exists():
+    dd = CR.issuance()
+    CR.spread_series(dd).to_parquet(out / "ai_credit_spreads.parquet")
+    dd.to_parquet(out / "ai_credit_issuance.parquet")
+    pr2 = dict(prices)
+    f_ = PARQUET / _fname("CRWV")
+    if f_.exists():
+        pr2["CRWV"] = pd.read_parquet(f_)["adjclose"].dropna()
+    cr_fl = CR.flags(dd, pr2)
+fl = sorted(fl + C.flags(ch, tw) + cr_fl, key=lambda f: int(f["id"][1:]))
 sec = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
 (out / "ai_flags.json").write_text(json.dumps({"flags": fl, "latest_filed": str(sec["filed"].max().date())},
                                               ensure_ascii=False, indent=1), encoding="utf-8")
