@@ -20,6 +20,7 @@ fh = load("views/flow_history.parquet")
 meta = load("views/meta.json")
 ev = load("views/evidence.json")
 state = load("views/state.json")
+hd = load("views/sector_holdings.parquet")
 
 last = kh.dropna(subset=["pred_foreign_z"]).iloc[-1]
 z = float(last.pred_foreign_z)
@@ -96,6 +97,11 @@ with right:
     fig.update_xaxes(range=[0, 110])
     plot(fig, 380, legend=False)
     st.markdown('<p class="note">S&P 섹터 E-mini 선물(CFTC 주간). 50보다 오른쪽이면 평소보다 순매수 쪽입니다. 화요일 기준·금요일 공표.</p>', unsafe_allow_html=True)
+if hd is not None:
+    st.markdown("#### 섹터별 대표 종목")
+    st.markdown(ui.holdings_table(hd, list(order["name"])), unsafe_allow_html=True)
+    st.markdown(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 위 히트맵과 같은 순서(1개월 순유입 순)입니다. '
+                '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>', unsafe_allow_html=True)
 with st.expander("산업·테마 ETF (반도체·은행·바이오·방산 등)"):
     t = ind.assign(flow_1m=ind.flow_1m * 100, rs_1m=ind.rs_1m * 100, rs_1w=ind.rs_1w * 100)[["name", "score", "direction", "flow_1m", "rs_1m", "rs_1w", "flow_src"]]
     st.dataframe(t.rename(columns={"name": "산업", "score": "점수", "direction": "방향", "flow_1m": "1M 순유입%", "rs_1m": "1M RS%p", "rs_1w": "1W RS%p",

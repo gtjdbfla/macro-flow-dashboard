@@ -20,6 +20,7 @@ agg = load("results/ai_cloud_agg.parquet")
 usd = load("views/sector_flow_usd.parquet")
 nxt = load("views/flow_next.json")
 ha = load("views/home_ai.parquet")
+hd = load("views/sector_holdings.parquet")
 cq = load("views/ai_capex_q.parquet")
 ev = load("views/evidence.json")
 fh = load("views/flow_history.parquet")
@@ -131,6 +132,11 @@ def flow_detail():
         st.markdown('<p class="note" style="margin-top:10px">금액은 큰 섹터(Technology·Financials)가, 비율은 작은 섹터(Materials·Utilities)가 두드러집니다. '
                     '두 기준 모두 보세요.</p>', unsafe_allow_html=True)
 
+    if hd is not None:
+        st.markdown("#### 섹터별 대표 종목")
+        st.markdown(ui.holdings_table(hd, list(etf.sort_values("flow_20d_usd", ascending=False)["name"])), unsafe_allow_html=True)
+        st.markdown(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 순서는 위 표와 같은 20일 순유입 금액순입니다. '
+                    '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>', unsafe_allow_html=True)
     ui.stage("다음", "다음에 자금이 몰릴 곳 후보", "과거 백테스트 기준 · 근거 등급을 함께 봅니다")
     rules = pd.DataFrame(nxt["rules"])
     u = rules[rules.rule == "us_flow"].set_index("split")

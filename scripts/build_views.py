@@ -208,6 +208,15 @@ for sym, lab in _SEC.items():
                  "tna": float(d["tna"].iloc[-1]), "as_of": str(d.index[-1].date())})
 pd.DataFrame(rows).to_parquet(V / "sector_flow_usd.parquet")
 
+# 섹터 ETF 대표 종목(상위 8): SPDR 공개 보유 종목 파일. 산업 ETF는 동일가중이라 '대표'가 의미 없어 제외
+_hf = PARQUET / "ssga_holdings.parquet"
+if _hf.exists():
+    _h = pd.read_parquet(_hf)
+    _h = _h[_h.etf.isin(list(_SEC))].copy()
+    _h["sector"] = _h.etf.map(_SEC)
+    _h["top_n"] = _h.groupby("etf").weight.transform("size")
+    _h[_h["rank"] <= 8].to_parquet(V / "sector_holdings.parquet")
+
 fr = pd.read_parquet(R / "flow_rules.parquet") if (R / "flow_rules.parquet").exists() else pd.DataFrame()
 secn = pd.read_parquet(R / "sector_snapshot.parquet")
 etf = secn[secn.flow_src == "ETF유입"].sort_values("flow_1m", ascending=False)

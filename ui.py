@@ -4,6 +4,7 @@
 레이아웃 원칙(PC 우선): 본문 16px · 한 줄 70자 안팎 · 문단 대신 '큰 숫자 + 짧은 설명' 카드 · 같은 줄의 카드는 높이를 맞춘다 ·
 표는 잘리지 않을 폭에 둔다 · 경고·한계는 하나의 callout으로 모은다."""
 import json
+import re
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -55,6 +56,7 @@ h3{font-size:1.2rem!important;margin:1.2rem 0 .5rem!important}
 .mini th{text-align:left;color:#8a99a3;font-weight:600;font-size:.8rem;padding:4px 8px;border-bottom:1px solid #64748b44}
 .mini td{padding:5px 8px;border-bottom:1px solid #64748b22}
 .mini td.r,.mini th.r{text-align:right}
+.hold td{padding:8px;vertical-align:top;line-height:2}.hold .chip{margin:2px 4px 2px 0}
 .chain{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}
 .step{border:1px solid #64748b44;border-radius:12px;padding:16px 18px;min-width:0}
 .step .n{font-size:.76rem;color:#8a99a3;font-weight:700;letter-spacing:.06em}
@@ -185,6 +187,28 @@ def purpose(question: str, answer: str, steps, badges: str = ""):
 def legend():
     st.markdown('<div class="legend"><span>근거 등급</span>' + badge("검증됨", "good") + "세 구간(2005–18·2019–22·2023~)에서 같은 방향" + badge("단서", "warn") +
                 "방향은 보이나 약함" + badge("참고", "mid") + "근거 부족·현황만</div>", unsafe_allow_html=True)
+
+
+_STRIP = re.compile(r"(?<![A-Za-z])(INC|CORP|CORPORATION|CO|PLC|LTD|HOLDINGS?|CLASS [A-C]|CL [A-C]|THE|COMPANY|SHARES)(?![A-Za-z])\.?", re.I)
+
+
+def short_name(n: str) -> str:
+    """ETF 보유 종목명의 법인 접미사·주식 종류를 떼어 짧게."""
+    t = _STRIP.sub(" ", n.replace("/", " ").replace("+", "&")).strip(" &")
+    return " ".join(w.capitalize() if len(w) > 3 else w for w in t.split())
+
+
+def holdings_table(hd, sector_order):
+    """섹터별 대표 종목 표. hd: sector_holdings 뷰, sector_order: 표시 순서(섹터명 리스트)."""
+    rows = []
+    for sec_name in sector_order:
+        g = hd[hd.sector == sec_name].sort_values("rank")
+        if g.empty:
+            continue
+        cells = "".join(f'<span class="chip nu"><b>{r.ticker}</b> {short_name(r.name)} {r.weight:.1f}%</span>' for r in g.head(5).itertuples())
+        rows.append(f"<tr><td><b>{sec_name}</b><br><span class='muted'>{g.etf.iloc[0]} · 보유 {int(g.top_n.iloc[0])}종목</span></td>"
+                    f"<td>{cells}</td><td class='r'>{g.head(5).weight.sum():.0f}%</td></tr>")
+    return ("<table class='mini hold'><tr><th>섹터</th><th>대표 종목 (ETF 내 비중)</th><th class='r'>상위 5 합</th></tr>" + "".join(rows) + "</table>")
 
 
 def freshness(meta: dict):

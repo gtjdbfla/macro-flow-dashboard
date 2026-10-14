@@ -42,3 +42,41 @@ def collect(tickers=TICKERS) -> dict:
             out[t] = {"error": str(e)[:200]}
         time.sleep(0.5)
     return out
+
+
+HOLD_URL = "https://www.ssga.com/us/en/intermediary/etfs/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{t}.xlsx"
+
+
+def fetch_holdings(ticker: str) -> pd.DataFrame:
+    """ETF 보유 종목(이름·티커·비중%). 비중이 큰 순서. 현금·선물 등 티커 없는 줄은 뺀다."""
+    r = requests.get(HOLD_URL.format(t=ticker.lower()), headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+    r.raise_for_status()
+    raw = pd.read_excel(io.BytesIO(r.content), header=None)
+    asof = pd.to_datetime(str(raw.iloc[2, 1]).replace("As of", "").strip(), format="%d-%b-%Y", errors="coerce")
+    d = raw.iloc[5:, [0, 1, 4]].copy()
+    d.columns = ["name", "ticker", "weight"]
+    d["weight"] = pd.to_numeric(d["weight"], errors="coerce")
+    d = d.dropna(subset=["weight", "ticker"])
+    d = d[d.ticker.astype(str).str.fullmatch(r"[A-Z.\-]{1,6}")]
+    d = d.sort_values("weight", ascending=False).reset_index(drop=True)
+    d.insert(0, "etf", ticker)
+    d["as_of"] = asof
+    d["rank"] = range(1, len(d) + 1)
+    return d
+
+
+def collect_holdings(tickers=TICKERS) -> dict:
+    parts, out = [], {}
+    for t in tickers:
+        if t == "SPY":
+            continue
+        try:
+            d = fetch_holdings(t)
+            parts.append(d)
+            out[t] = {"n": len(d), "as_of": str(d.as_of.iloc[0].date())}
+        except Exception as e:
+            out[t] = {"error": str(e)[:200]}
+        time.sleep(0.5)
+    if parts:
+        pd.concat(parts, ignore_index=True).to_parquet(PARQUET / "ssga_holdings.parquet")
+    return out

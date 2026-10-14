@@ -54,6 +54,10 @@ if not only or "twse" in only:
         cov["twse"] = {"updated": now, "series": {}, "error": str(e)[:200]}
 if not only or "ssga" in only:
     cov["ssga"] = {"updated": now, "series": ssga.collect()}
+    try:
+        cov["ssga"]["holdings"] = ssga.collect_holdings()
+    except Exception as e:
+        cov["ssga"]["holdings_error"] = str(e)[:200]
 
 cov_path.write_text(json.dumps(cov, ensure_ascii=False, indent=1), encoding="utf-8")
 for src, v in cov.items():
