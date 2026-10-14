@@ -201,7 +201,7 @@ def short_name(n: str) -> str:
     out = []
     for w in ws:
         out.append(w.lower() if w in ("OF", "AND") else w.capitalize() if len(w) > 3 else w)
-    return re.sub(r" S", "'s", " ".join(out))
+    return re.sub(r" S(?![A-Za-z])", "'s", " ".join(out))
 
 
 def holdings_table(hd, sector_order):
