@@ -1,12 +1,17 @@
 # 운영 (사람·AI 개입 없이 매일 자동 갱신)
 
 ## 구조
-- **서버 크론 3줄** (`scripts/install_cron.sh`로 설치, 멱등): 코드 배포(5·35분마다 `deploy.sh`), 한국 수급 갱신(월~금 07:40 UTC), 미국·거시·공시 갱신(월~금 22:30 UTC).
+- **서버 크론 5줄** (`scripts/install_cron.sh`로 설치, 멱등):
+  - 코드 배포: 5·35분마다 `deploy.sh`
+  - `kr` 한국 수급 갱신: 월~금 07:40 UTC(16:40 KST)
+  - `us` 미국·거시·ETF·공시·채권 갱신: 월~금 22:30 UTC. 대만 월매출은 매월 10~12일(또는 지난달 값 미수신 시)만 수집
+  - `weekly` 백테스트·검증 통계 재계산: 일요일 09:00 UTC (평일 갱신은 백테스트를 건너뛴다 — 하루 새 데이터로는 결과가 거의 안 변함. 결과 파일이 없을 때만 최초 1회 계산)
+  - `filings` 실적 시즌 새 공시 확인: 1·4·7·10월 15~31일 3시간마다. SEC·클라우드·채권만 받아 새 공시가 있을 때만 AI 지표·점수·화면을 갱신 (크론은 일/요일을 함께 지정하면 OR이므로 요일은 `*`)
 - 갱신 = `docker compose exec`로 컨테이너 안에서 **한 번** `scripts/run_daily.py --mode kr|us` 실행. 안에서 순서대로:
   수집(재시도 2회) → build_features → run_backtests → run_ai → run_scoring → build_views → 장부 백업 → 신선도 점검 → 상태 기록.
 - 치명 단계(build_features·run_scoring·build_views)가 실패하면 뒤 단계를 건너뛰고 **이전 결과를 그대로 유지**(어긋난 입력으로 화면이 깨지지 않게). 수집이 실패해도 이전 데이터로 계속하고 경고로 남긴다.
 - `flock`(logs/.lock)이 `deploy.sh`와 갱신을 서로 막는다 — 갱신 중에는 재빌드가 끼어들지 않고, 배포 중에는 갱신이 건너뛰어진다(다음 회차에 실행).
-- 결과: `data/status.json`(마지막 실행), `data/status_history.jsonl`(최근 300회), 대시보드 '근거·방법 > 자동 갱신 상태', 문제가 있으면 홈 상단 경고. 로그 `logs/daily.log`.
+- 결과: `data/status.json`(마지막 전체 갱신), `data/status_<mode>.json`(모드별 마지막), 대시보드 **갱신 현황** 페이지(일정·다음 실행·소스별 신선도·이력), `data/status_history.jsonl`(최근 300회), 대시보드 '근거·방법 > 자동 갱신 상태', 문제가 있으면 홈 상단 경고. 로그 `logs/daily.log`.
 - 전향 검증 장부 `data/ledger/ledger.jsonl`은 복구가 불가능해 매 실행 뒤 `data/backups/ledger_YYYYMMDD.jsonl`로 백업(30일).
 
 ## 확인·수동 실행
