@@ -1,0 +1,155 @@
+<title>AI 수익성 보고서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap">
+<style>
+/* 레이아웃: 한 단 읽기 흐름(결론 → 근거 3개 절 → 한계 → 점검 목록). 차트는 한 폭, 클라우드 두 차트만 2열 */
+:root {
+  --bg: #f5f7f4; --card: #ffffff; --fg: #14201c; --muted: #5b6b65; --line: #dbe2dd; --accent: #0f766e;
+  --good: #15803d; --good-bg: #e3f3e8; --warn: #b45309; --warn-bg: #fbf0d9; --bad: #b91c1c; --bad-bg: #fbe4e1; --mid: #4b5d66; --mid-bg: #e8edf0;
+  --c-capex: #c2410c; --c-rev: #1d4ed8; --c-op: #15803d; --c-aws: #b45309; --c-gcp: #1d4ed8; --c-ms: #0f766e; --c-meta: #7e22ce; --c-orcl: #be123c;
+  --serif: "Noto Serif KR", "Batang", serif; --sans: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1512; --card: #151e1a; --fg: #e6efe9; --muted: #9bb0a7; --line: #26342e; --accent: #2dd4bf;
+    --good: #4ade80; --good-bg: #12301d; --warn: #fbbf24; --warn-bg: #3a2c0c; --bad: #f87171; --bad-bg: #3b1a18; --mid: #a7bac4; --mid-bg: #1b2830;
+    --c-capex: #fb923c; --c-rev: #60a5fa; --c-op: #4ade80; --c-aws: #fbbf24; --c-gcp: #60a5fa; --c-ms: #2dd4bf; --c-meta: #c084fc; --c-orcl: #fb7185; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1512; --card: #151e1a; --fg: #e6efe9; --muted: #9bb0a7; --line: #26342e; --accent: #2dd4bf;
+  --good: #4ade80; --good-bg: #12301d; --warn: #fbbf24; --warn-bg: #3a2c0c; --bad: #f87171; --bad-bg: #3b1a18; --mid: #a7bac4; --mid-bg: #1b2830;
+  --c-capex: #fb923c; --c-rev: #60a5fa; --c-op: #4ade80; --c-aws: #fbbf24; --c-gcp: #60a5fa; --c-ms: #2dd4bf; --c-meta: #c084fc; --c-orcl: #fb7185; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 400 15.5px/1.75 var(--sans); padding-inline: max(16px, 4vw); padding-block: 28px 56px; }
+.wrap { max-width: 860px; margin-inline: auto; display: flex; flex-direction: column; gap: 44px; }
+h1, h2 { font-family: var(--serif); text-wrap: balance; letter-spacing: -0.01em; margin: 0; }
+h1 { font-size: clamp(28px, 5.4vw, 40px); line-height: 1.25; }
+h2 { font-size: clamp(21px, 3.6vw, 26px); line-height: 1.35; }
+h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+p { margin: 0; }
+.meta { color: var(--muted); font-size: 13px; }
+.lede { font-size: 17.5px; line-height: 1.8; }
+header { display: flex; flex-direction: column; gap: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.kpi .k { font-size: 12.5px; color: var(--muted); }
+.kpi .v { font: 700 24px/1.3 var(--sans); font-variant-numeric: tabular-nums; }
+.kpi .s { font-size: 13px; color: var(--muted); }
+.signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.sigcol { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chip { display: flex; gap: 10px; align-items: baseline; padding: 7px 11px; border-radius: 8px; font-size: 13.5px; line-height: 1.45; }
+.chip b { font-size: 12px; min-width: 2.6em; }
+.chip.good { background: var(--good-bg); color: var(--good); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.mid { background: var(--mid-bg); color: var(--mid); }
+.chip span { color: var(--fg); }
+section { display: flex; flex-direction: column; gap: 16px; }
+.fig { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 10px; min-width: 0; }
+.fig .cap { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+svg.chart { width: 100%; height: auto; display: block; }
+.grid { stroke: var(--line); stroke-width: 1; } .zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.tick { fill: var(--muted); font-size: 10.5px; font-family: var(--sans); font-variant-numeric: tabular-nums; }
+.ln { fill: none; stroke-width: 2.2; stroke-linejoin: round; } .dot { stroke: var(--card); stroke-width: 1; } .dot.end { stroke-width: 2; }
+.endlabel { font-size: 11.5px; font-weight: 700; font-family: var(--sans); }
+.c-capex { stroke: var(--c-capex); fill: var(--c-capex); color: var(--c-capex); } .c-rev { stroke: var(--c-rev); fill: var(--c-rev); color: var(--c-rev); }
+.c-op { stroke: var(--c-op); fill: var(--c-op); color: var(--c-op); } .c-aws { stroke: var(--c-aws); fill: var(--c-aws); color: var(--c-aws); }
+.c-gcp { stroke: var(--c-gcp); fill: var(--c-gcp); color: var(--c-gcp); } .c-ms { stroke: var(--c-ms); fill: var(--c-ms); color: var(--c-ms); }
+.c-meta { stroke: var(--c-meta); fill: var(--c-meta); color: var(--c-meta); } .c-orcl { stroke: var(--c-orcl); fill: var(--c-orcl); color: var(--c-orcl); }
+path.ln { fill: none; } text.endlabel { stroke: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.sw { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: currentColor; }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, thead th { text-align: left; } thead th { font-size: 12px; color: var(--muted); font-weight: 700; }
+tbody th { font-weight: 500; } tr.tot th, tr.tot td { font-weight: 700; border-top: 2px solid var(--line); } tr:last-child th, tr:last-child td { border-bottom: 0; }
+.bars { display: flex; flex-direction: column; gap: 6px; }
+.bar { display: grid; grid-template-columns: 92px 1fr 52px; gap: 10px; align-items: center; font-size: 13px; }
+.bt { background: var(--mid-bg); height: 10px; border-radius: 5px; overflow: hidden; } .bt i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+.bv { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+ul.disc { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.who { font-weight: 700; color: var(--accent); }
+.note { font-size: 13.5px; color: var(--muted); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
+footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="meta">매크로·자금흐름 대시보드 · AI 모듈 · 기준: SEC 공시 {{PERIOD}} 분기까지(최신 공시 {{ASOF}}), 대만 월매출 {{TW_MONTH}}</p>
+  <h1>AI 투자는 수익으로 돌아오고 있는가</h1>
+  <p class="lede">수요와 클라우드 수익은 가속하고 있습니다. 같은 기간 투자 규모는 매출과 이익보다 훨씬 빠르게 늘어 투자 회수와 잉여현금흐름이 눌리고, 그 부담이 채권 조달로 옮겨가고 있습니다.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">Big4 CAPEX, 최근 12개월</div><div class="v">{{CAPEX}}</div><div class="s">전년 대비 {{CAPEX_YOY}}</div></div>
+    <div class="kpi"><div class="k">같은 기간 매출 · 영업이익</div><div class="v">{{REV_YOY}} · {{OP_YOY}}</div><div class="s">CAPEX가 영업현금흐름의 {{CAPEX_OCF}}</div></div>
+    <div class="kpi"><div class="k">잉여현금흐름</div><div class="v">{{FCF}}</div><div class="s">전년 대비 {{FCF_CHG}}</div></div>
+    <div class="kpi"><div class="k">클라우드 3사 매출 · 영업이익률</div><div class="v">{{CLOUD_YOY}} · {{CLOUD_M}}</div><div class="s">1년 전 {{CLOUD_Y0}} · {{CLOUD_M0}}</div></div>
+  </div>
+  <div class="signals">{{CHIPS}}</div>
+  <p class="note">Big4는 Microsoft, Alphabet, Amazon, Meta의 합계입니다. 신호는 사전에 고정한 규칙으로 판정했고 종합 점수는 만들지 않았습니다.</p>
+</header>
+
+<section>
+  <h2>1. 투자는 수익보다 4배 빠르게 늘었다</h2>
+  <p>4사 합계 CAPEX는 최근 12개월 {{CAPEX}}로 영업현금흐름 {{OCF}}의 {{CAPEX_OCF}}를 차지합니다. 매출과 영업이익은 각각 {{REV_YOY}}, {{OP_YOY}} 늘었습니다. 1년 전 CAPEX 1달러가 이후 1년 동안 늘린 영업이익은 {{RECOUP}}달러입니다.</p>
+  <div class="fig"><div class="cap">Big4 합계, 최근 12개월 기준 전년 대비 증가율</div>{{CHART_A}}{{LEG_A}}</div>
+  <div class="tablebox"><table>
+    <thead><tr><th>회사</th><th>CAPEX 12M ($B)</th><th>CAPEX 증가</th><th>매출 증가</th><th>영업이익 증가</th><th>FCF ($B)</th><th>CAPEX/OCF</th><th>수주잔고 ($B)</th></tr></thead>
+    <tbody>{{ROWS}}</tbody></table></div>
+  <p class="note">아마존은 FCF가 적자, 오라클의 CAPEX는 영업현금흐름의 1.6배, 코어위브는 약 3배입니다. NVIDIA는 투자를 받는 쪽이라 CAPEX 효율 열을 비웠습니다. 모든 수치는 회사 전체 재무제표 기준이라 AI 전용 수치가 아닙니다.</p>
+</section>
+
+<section>
+  <h2>2. 수요와 클라우드 수익은 가속하고 있다</h2>
+  <p>AWS, Google Cloud, Microsoft Intelligent Cloud의 합계 매출이 {{CLOUD_YOY}} 늘었고(1년 전 {{CLOUD_Y0}}) 영업이익률은 {{CLOUD_M}}로 1년 전 {{CLOUD_M0}}보다 높습니다. 연결 기준 투자 회수는 약하지만, AI 서비스를 파는 부문은 규모와 수익성이 함께 커지고 있습니다.</p>
+  <div class="pair">
+    <div class="fig"><div class="cap">클라우드 부문 매출 증가율 (전년 동기 대비)</div>{{CHART_B}}{{LEG_B}}</div>
+    <div class="fig"><div class="cap">클라우드 부문 영업이익률</div>{{CHART_B2}}</div>
+  </div>
+  <div class="two">
+    <div class="fig"><div class="cap">대만 AI 공급망 월매출 증가율, {{TW_MONTH}} (전년 동월 대비)</div><div class="bars">{{BARS}}</div></div>
+    <div class="fig"><div class="cap">경영진이 직접 공개한 AI 수치 (원문)</div><ul class="disc">{{DISC}}</ul></div>
+  </div>
+  <p class="note">수주잔고(RPO)는 Microsoft +82%, Alphabet +380%, Oracle +46%로 매출 증가율을 앞섭니다. 대만 공급망 월매출은 분기 공시보다 1~2개월 빠른 선행 지표입니다. 이력은 수집을 시작한 시점부터 쌓입니다.</p>
+</section>
+
+<section>
+  <h2>3. 부담은 채권 조달로 옮겨가고 있다</h2>
+  <p>빅테크 3사의 10년 만기 신규 채권 가산금리가 올랐습니다. Alphabet {{G10}}, Amazon {{A10}}, Meta {{M10}}입니다. 코어위브는 하이일드로 조달합니다({{CRWV}}). 발행량이 늘어난 영향도 섞여 있어 곧바로 신용 악화로 읽지는 않습니다.</p>
+  <div class="fig"><div class="cap">신규 발행 10년 환산 가산금리 (USD 발행, bp, 국채 대비)</div>{{CHART_C}}{{LEG_C}}</div>
+</section>
+
+<section>
+  <h2>4. 이 보고서를 어디까지 믿을 수 있나</h2>
+  <div class="two">
+    <ul class="list">
+      <li><b>확인된 사실</b>: 재무 수치는 SEC 공시이고 공시일 이후에만 사용했습니다. 클라우드 부문은 실적 발표문 표를 읽었고, 24·13·24개 분기가 모두 파싱됐습니다.</li>
+      <li><b>범위의 한계</b>: AI 전용 매출과 CAPEX는 분리되지 않습니다. Microsoft Intelligent Cloud에는 비AI 사업이 있고 2024년 8월 부문 재편이 있었습니다.</li>
+    </ul>
+    <ul class="list">
+      <li><b>예측력은 없다</b>: Big4 CAPEX가 가속·감속한 분기 뒤 NVIDIA·SOXX 20일 수익률 {{EV_N}}건 중 {{EV_ZERO}}건의 신뢰구간이 0을 포함했습니다. 이 지표는 주가 예측기가 아니라 현황판입니다.</li>
+      <li><b>비어 있는 것</b>: CAPEX 가이던스, CDS와 유통시장 수익률, HBM 가격, 한국 반도체 수출 속보는 무료 데이터가 없습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>5. 다음에 확인할 것</h2>
+  <ol class="list">
+    <li>다음 분기 공시(10월 말): CAPEX 증가율과 매출 증가율의 격차가 줄어드는지, 잉여현금흐름의 전년 대비 감소 폭이 커지는지.</li>
+    <li>클라우드 영업이익률이 40% 부근에서 유지되는지. Microsoft는 이미 41%에서 평탄합니다.</li>
+    <li>Alphabet과 Amazon의 10년 신규 발행 가산금리가 85bp, 80bp를 넘어 더 넓어지는지. 오라클이 발행을 재개하면 5년 구간 75bp가 기준입니다.</li>
+    <li>대만 핵심 8사 중 월매출 증가율이 20% 아래로 내려가는 회사가 늘어나는지.</li>
+    <li>전향 검증 장부(H5): 주가 하락과 수익성 지표가 어긋나는 날이 쌓이는지. 판정에는 독립 사례 5건 이상이 필요합니다.</li>
+  </ol>
+</section>
+
+<footer>
+  <span>출처: SEC EDGAR(XBRL 재무, 8-K 실적 발표문, FWP·8-K 발행 조건), TWSE 공개 API, Yahoo Finance(가격).</span>
+  <span>상세 규칙과 검증: 저장소 gtjdbfla/macro-flow-dashboard의 docs/AI_PROFITABILITY.md · 라이브 대시보드는 AI PROFITABILITY 섹션.</span>
+  <span>투자 조언이 아닙니다. 수치는 공시 시점의 값이며 이후 정정될 수 있습니다.</span>
+</footer>
+</div>
