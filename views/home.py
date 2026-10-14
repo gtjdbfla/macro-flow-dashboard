@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
 
 import ui
 from ui import badge, callout, chips, duo, ev_card, kpis, level_kind, load, pct, plot, summary_card, trio
@@ -21,13 +22,17 @@ nxt = load("views/flow_next.json")
 ha = load("views/home_ai.parquet")
 cq = load("views/ai_capex_q.parquet")
 ev = load("views/evidence.json")
+fh = load("views/flow_history.parquet")
+hist = load("results/ai_history.parquet")
 tw = ui.load_parquet_dir("twse_monthly.parquet")
 flags = json.loads(open(ui.DATA_DIR / "results/ai_flags.json", encoding="utf-8").read())["flags"] if (ui.DATA_DIR / "results/ai_flags.json").exists() else []
 
 # ── 머리말 ───────────────────────────────────────────────────────────────────
 st.title("Macro & Capital Flow")
-st.markdown('<p class="lede">① 월가의 자금이 어디에 있고 어떻게 움직여 왔는지, ② AI 기업의 수익성이 어떻게 변하고 있는지를 데이터로 봅니다. '
+st.markdown('<p class="lede">두 가지 질문에 <b>과거 → 현재 → 다음</b> 순서로 답합니다. '
+            '① 월가의 돈은 어디에서 어디로 움직였고 지금 어디에 있나 · ② AI 기업의 수익성은 어떻게 변해 왔고 지금 어떤 상태인가. '
             '앞날을 맞히는 도구가 아니라, 확인된 것과 아직 확인되지 않은 것을 구분해 보여주는 현황판입니다.</p>', unsafe_allow_html=True)
+ui.legend()
 ui.freshness(meta)
 stt = load("status.json")
 if stt is not None:
@@ -90,7 +95,23 @@ def detail():
 
 
 def flow_detail():
-    st.markdown("### 자금은 어디로 들어오고 어디서 빠졌나 (최근 20일, 실제 ETF 설정·환매)")
+    ui.stage("과거", "최근 1년, 섹터별 자금은 어떻게 움직였나", "20일 순유입(%순자산) · 위 띠는 매크로 국면")
+    d = fh.tail(52)
+    secs = [c for c in d.columns if c != "regime"]
+    codes = {"Goldilocks": 0, "Reflation": 1, "Slowdown": 2, "Stagflation": 3}
+    colors = ["#22a55a", "#e0b41e", "#5b8def", "#ee5555"]
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.07, 0.93], vertical_spacing=0.015)
+    fig.add_trace(go.Heatmap(z=[d["regime"].map(codes).astype(float).values], x=d.index, colorscale=[[i / 3, c] for i, c in enumerate(colors)], zmin=0, zmax=3,
+                             showscale=False, text=[d["regime"].fillna("").values], hovertemplate="%{x|%Y-%m-%d} %{text}<extra></extra>"), row=1, col=1)
+    fig.add_trace(go.Heatmap(z=(d[secs].T * 100).clip(-10, 10).values, x=d.index, y=secs, colorscale="RdYlGn", zmid=0, zmin=-10, zmax=10,
+                             colorbar=dict(title="%", len=0.7, thickness=10), hovertemplate="%{y} %{x|%Y-%m-%d}: %{z:+.1f}%<extra></extra>"), row=2, col=1)
+    fig.update_yaxes(visible=False, row=1, col=1)
+    fig.update_yaxes(autorange="reversed", row=2, col=1)
+    plot(fig, 360, legend=False)
+    st.markdown('<p class="note">초록=자금 유입, 빨강=유출. 위 띠 색: 초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation. '
+                '더 긴 기간(2007~)은 <b>① 월가 자금</b> 페이지에서 봅니다.</p>', unsafe_allow_html=True)
+
+    ui.stage("현재", "지금 자금은 어디로 들어오고 어디서 빠졌나", "최근 20일, 실제 ETF 설정·환매")
     a, b = st.columns([1.35, 1], gap="large")
     with a:
         d = etf.sort_values("flow_20d_usd")
@@ -110,7 +131,7 @@ def flow_detail():
         st.markdown('<p class="note" style="margin-top:10px">금액은 큰 섹터(Technology·Financials)가, 비율은 작은 섹터(Materials·Utilities)가 두드러집니다. '
                     '두 기준 모두 보세요.</p>', unsafe_allow_html=True)
 
-    st.markdown("### 과거 백테스트로 본 '다음에 자금이 몰릴 곳' 후보")
+    ui.stage("다음", "다음에 자금이 몰릴 곳 후보", "과거 백테스트 기준 · 근거 등급을 함께 봅니다")
     rules = pd.DataFrame(nxt["rules"])
     u = rules[rules.rule == "us_flow"].set_index("split")
     k = rules[rules.rule == "kr_foreign"].set_index("split")
@@ -138,7 +159,24 @@ def flow_detail():
 
 
 def ai_detail():
-    st.markdown("### 누가 투자하나 — 회사별 12개월 CAPEX와 변화")
+    ui.stage("과거", "투자와 수익은 어떻게 변해 왔나", "최근 12개월 기준 전년 대비, 분기마다 갱신")
+    b4h = hist[hist.ticker == "BIG4"].dropna(subset=["capex_yoy"]).sort_values("period_end").tail(12)
+    p1, p2 = st.columns(2, gap="large")
+    with p1:
+        st.markdown("**투자는 매출·이익보다 빠르게 늘었다** (Big4, 전년 대비 %)")
+        fig = go.Figure()
+        for c, n, col in [("capex_yoy", "CAPEX", "#f97316"), ("rev_yoy", "매출", "#5b8def"), ("opinc_yoy", "영업이익", "#22a55a")]:
+            fig.add_scatter(x=b4h.period_end, y=b4h[c] * 100, name=n, mode="lines+markers", line=dict(color=col, width=2.4))
+        plot(fig, 300)
+    with p2:
+        st.markdown("**클라우드 매출은 가속하고 마진도 오른다** (3사 합계)")
+        ca = agg.tail(10)
+        fig = go.Figure()
+        fig.add_bar(x=ca.quarter_end, y=ca.yoy * 100, name="매출 증가율(%)", marker_color="#5b8def", opacity=.8)
+        fig.add_scatter(x=ca.quarter_end, y=ca.margin * 100, name="영업이익률(%)", mode="lines+markers", line=dict(color="#f59e0b", width=2.4))
+        plot(fig, 300)
+
+    ui.stage("현재", "누가 얼마를 투자하고, 얼마나 벌어들이나", "회사별 12개월 CAPEX와 변화")
     t = ha.copy()
     tab = pd.DataFrame({"회사": t["name"], "CAPEX (억 달러)": t.capex / 1e8, "비중": t.share * 100, "1년간 증가액 (억 달러)": t.capex_delta / 1e8,
                         "증가 기여": t.delta_share * 100, "증가율": t.capex_yoy * 100, "증가율 변화 (%p, 2분기 전 대비)": (t.capex_yoy - t.capex_yoy_2q) * 100,
@@ -156,7 +194,7 @@ def ai_detail():
                 f"Oracle의 12개월은 {t[t.ticker == 'ORCL'].period_end.iloc[0][:7]}까지(결산월 차이)\n"
                 f"- **영업현금흐름 대비 부담이 2분기 전보다 커진 곳**: {', '.join(worse) or '없음'} · **줄어든 곳**: {', '.join(better) or '없음'}")
 
-    st.markdown("### 변화량 — 1년 전보다 얼마를 더 쓰고, 얼마를 더 벌었나")
+    st.markdown("#### 1년 전보다 얼마를 더 쓰고, 얼마를 더 벌었나")
     a, b = st.columns(2, gap="large")
     with a:
         st.markdown("**분기별 CAPEX (억 달러)**")
@@ -192,7 +230,7 @@ def ai_detail():
                       ("새로 번 영업이익 / 영업현금흐름", f"{d_op/d_cap*100:.0f}% / {d_ocf/d_cap*100:.0f}%", "CAPEX 증가 대비"),
                       ("잉여현금흐름 변화", f"{d_fcf/1e8:+,.0f}억", "달러")]), unsafe_allow_html=True)
 
-    st.markdown("### 투자를 받는 쪽")
+    st.markdown("#### 투자를 받는 쪽")
     nv = latest[latest.ticker == "NVDA"].iloc[0]
     tiles = [("NVIDIA 매출", pct(nv.rev_yoy * 100), "최근 12개월, 전년 대비")]
     if tw is not None and len(tw):
@@ -200,24 +238,22 @@ def ai_detail():
         tiles.append(("TSMC 월매출", pct(tsmc.yoy), f"{tsmc.month.strftime('%Y-%m')}, 전년 동월 대비"))
     tiles.append(("클라우드 3사 매출", pct(cl.yoy * 100), "최근 분기, 전년 동기 대비"))
     st.markdown(kpis(tiles), unsafe_allow_html=True)
+    ui.stage("다음", "무엇을 지켜봐야 하나", "예측이 아니라 확인할 항목 · 가정 시나리오는 ② AI 수익성 페이지")
+    a, b = st.columns(2, gap="large")
+    with a:
+        st.markdown("**지금 경고·주의 신호**")
+        watch = [f for f in flags if level_kind(f["level"]) in ("bad", "warn")]
+        for f in watch:
+            st.markdown(badge(f["level"], level_kind(f["level"])) + f"**{f['title']}**", unsafe_allow_html=True)
+        if not watch:
+            st.write("현재 경고·주의 신호 없음")
+    with b:
+        st.markdown("**다음에 확인될 것**")
+        st.markdown("- 미국 분기 실적 공시(10월 말): CAPEX 증가율과 매출 증가율의 격차, 잉여현금흐름\n"
+                    "- 대만 AI 공급망 월매출(매월 10일경): 증가율 20% 아래 회사가 늘어나는지\n"
+                    "- 빅테크 신규 채권 발행 가산금리: 직전보다 더 넓어지는지")
     callout("투자 내역(서버·건물·칩 등 구성)은 공시에 세부가 없어 알 수 없고, 위 CAPEX는 <b>회사 전체</b> 수치입니다. 이 페이지는 현재 상태와 방향을 보여줄 뿐 주가를 예측하지 않습니다.", "info")
 
 
 detail()
-
-# ── 하단 ─────────────────────────────────────────────────────────────────────
-st.divider()
-a, b = st.columns(2, gap="large")
-with a:
-    st.markdown("**AI 수익성 경고·주의 신호**")
-    watch = [f for f in flags if level_kind(f["level"]) in ("bad", "warn")]
-    for f in watch:
-        st.markdown(badge(f["level"], level_kind(f["level"])) + f"**{f['title']}**", unsafe_allow_html=True)
-    if not watch:
-        st.write("현재 경고·주의 신호 없음")
-with b:
-    st.markdown("**다음에 확인될 것**")
-    st.markdown("- 미국 분기 실적 공시(10월 말): CAPEX 증가율과 매출 증가율의 격차, 잉여현금흐름\n"
-                "- 대만 AI 공급망 월매출(매월 10일경): 증가율 20% 아래 회사가 늘어나는지\n"
-                "- 빅테크 신규 채권 발행 가산금리: 직전보다 더 넓어지는지")
-st.markdown('<p class="note">상단 메뉴: <b>월가 자금</b>(지금·과거·앞으로), <b>AI 수익성</b>(변화·시나리오), <b>갱신 현황</b>, <b>근거·방법</b>.</p>', unsafe_allow_html=True)
+st.markdown('<p class="note">상단 메뉴: <b>① 월가 자금</b>(과거·현재·다음 전체), <b>② AI 수익성</b>(변화·시나리오), <b>갱신 현황</b>, <b>근거·방법</b>.</p>', unsafe_allow_html=True)

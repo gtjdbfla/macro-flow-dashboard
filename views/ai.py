@@ -24,9 +24,15 @@ B = latest[latest.ticker == "BIG4"].iloc[0]
 LT = latest.set_index("ticker")
 cl = agg.iloc[-1]
 
-st.title("AI 수익성")
-st.markdown('<p class="lede">AI 투자가 수익으로 돌아오고 있는지를 <b>투자 → 클라우드 수요 → 이익·현금 → 조달</b> 네 단계로 나눠 봅니다. '
-            '공시 재무는 회사 전체 기준이라 AI만의 수치는 아닙니다. 이 페이지는 현재 상태와 방향을 보여줄 뿐 주가를 예측하지 않습니다.</p>', unsafe_allow_html=True)
+st.title("② AI 수익성")
+_cl = agg.iloc[-1]
+ui.purpose("AI 기업의 수익성은 어떻게 변해 왔고, 지금 어떤 상태이며, 앞으로 무엇을 보면 될까?",
+           f"파는 쪽(클라우드 매출 <b>{pct(_cl.yoy*100)}</b>, 마진 {_cl.margin*100:.0f}%)은 좋아지고, 투자하는 쪽(Big4 CAPEX <b>{pct(B.capex_yoy*100)}</b> vs 매출 "
+           f"<b>{pct(B.rev_yoy*100)}</b>)은 회수·조달 부담이 커지고 있습니다. 공시 재무는 회사 전체 기준이라 AI만의 수치는 아니며, 주가를 예측하지 않습니다.",
+           [("과거", "투자·매출·이익·클라우드가 최근 3년 어떻게 변했나"),
+            ("현재", "투자 → 클라우드 수요 → 이익·현금 → 조달 네 단계 상태 · 회사별 표"),
+            ("다음", "예측이 아닌 두 도구: 가정 시나리오 · 대만 공급망 선행 지표")],
+           badge("현황판 · 예측 아님", "warn"))
 ui.freshness(meta)
 
 
@@ -60,12 +66,9 @@ steps = [
 lab = {"good": "양호", "warn": "주의", "bad": "경고", "mid": "중립"}
 html = '<div class="chain">' + "".join(
     f'<div class="step {k}"><div class="n">STEP {n}</div><div class="t">{t} {badge(lab[k], k)}</div><div class="kv">{kv}</div></div>' for n, t, k, kv in steps) + "</div>"
-st.markdown(html, unsafe_allow_html=True)
-st.markdown('<p class="note">상태 판정은 사전에 고정한 규칙의 신호 10개를 단계별로 묶은 것입니다(근거·방법 페이지). 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>',
-            unsafe_allow_html=True)
 
-# ── 변화 ────────────────────────────────────────────────────────────────────
-st.header("1. 어떻게 변해 왔나")
+# ── 과거 ────────────────────────────────────────────────────────────────────
+ui.stage("과거", "투자와 수익은 어떻게 변해 왔나", "최근 12개월 기준 전년 대비")
 b4 = hist[hist.ticker == "BIG4"].dropna(subset=["capex_yoy"]).sort_values("period_end").tail(12)
 a, b = st.columns(2, gap="large")
 with a:
@@ -82,6 +85,11 @@ with b:
     fig.add_scatter(x=ca.quarter_end, y=ca.margin * 100, name="영업이익률(%)", mode="lines+markers", line=dict(color="#f59e0b", width=2.4))
     plot(fig, 300)
 
+# ── 현재 ────────────────────────────────────────────────────────────────────
+ui.stage("현재", "지금 네 단계는 어떤 상태인가", "투자 → 수요 → 이익·현금 → 조달")
+st.markdown(html, unsafe_allow_html=True)
+st.markdown('<p class="note">상태 판정은 사전에 고정한 규칙의 신호 10개를 단계별로 묶은 것입니다(근거·방법 페이지). 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>',
+            unsafe_allow_html=True)
 c, d = st.columns([1.25, 1], gap="large")
 with c:
     st.markdown("**회사별 현황**")
@@ -109,8 +117,8 @@ with d:
     if len(crwv):
         st.markdown('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>", unsafe_allow_html=True)
 
-# ── 앞으로 ──────────────────────────────────────────────────────────────────
-st.header("2. 앞으로 — 예측이 아니라 두 가지 도구")
+# ── 다음 ────────────────────────────────────────────────────────────────────
+ui.stage("다음", "앞으로 — 예측이 아니라 두 가지 도구")
 st.markdown('<p class="note">이 지표들은 주가를 예측한 적이 없습니다(이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못함). '
             '대신 가정을 직접 넣어 결과를 보는 산식 시나리오와, 다음에 확인될 선행 지표를 제공합니다.</p>', unsafe_allow_html=True)
 e1, e2 = st.columns(2, gap="large")

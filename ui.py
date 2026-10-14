@@ -61,8 +61,20 @@ h3{font-size:1.2rem!important;margin:1.2rem 0 .5rem!important}
 .step .t{font-size:1.04rem;font-weight:700;margin:2px 0 8px}
 .step .kv{font-size:.9rem;line-height:1.6}
 .step.good{border-top:3px solid #22a55a}.step.warn{border-top:3px solid #e08a1e}.step.bad{border-top:3px solid #ee5555}.step.mid{border-top:3px solid #64748b}
+/* 과거 → 현재 → 다음: 모든 페이지가 같은 순서로 읽히도록 단계 표지를 쓴다 */
+.stage{display:flex;align-items:center;gap:12px;font-size:1.3rem;font-weight:700;margin:2.2rem 0 .7rem;padding-top:1.1rem;border-top:1px solid #64748b33;letter-spacing:-.01em}
+.stage .s{font-size:.82rem}
+.tag{display:inline-block;padding:3px 12px;border-radius:8px;font-size:.82rem;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.tag.past{background:#64748b33;color:#b4c0c8}.tag.now{background:#2563eb2e;color:#7fa6f5}.tag.next{background:#e08a1e2e;color:#f0a53c}
+.purpose{border:1px solid #64748b44;border-radius:14px;padding:20px 24px;margin:.2rem 0 1rem;display:flex;flex-direction:column;gap:12px}
+.purpose .q{font-size:1.25rem;font-weight:800;letter-spacing:-.01em}
+.purpose .a{font-size:1.06rem;line-height:1.62}
+.flow3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.flow3 div.c{background:#64748b12;border-radius:10px;padding:10px 14px;font-size:.92rem;line-height:1.55;color:#c0cbd2}
+.flow3 div.c .tag{margin-bottom:5px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;font-size:.86rem;color:#8a99a3;margin:.1rem 0 .6rem}
 div[data-testid="stMetricValue"]{font-size:1.6rem}
-@media (max-width:1100px){.duo,.trio,.chain{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+@media (max-width:1100px){.duo,.trio,.chain,.flow3{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
 </style>
 """
 
@@ -152,6 +164,27 @@ def chips(label, names, kind):
 
 def callout(text, kind=""):
     st.markdown(f'<div class="callout {kind}">{text}</div>', unsafe_allow_html=True)
+
+
+TAGS = {"과거": "past", "현재": "now", "다음": "next"}
+
+
+def stage(tag: str, title: str, sub: str = ""):
+    """단계 표지: [과거|현재|다음] + 제목(+ 부연). 페이지마다 같은 순서(과거 → 현재 → 다음)로 쓴다."""
+    s = f'<span class="s muted">{sub}</span>' if sub else ""
+    st.markdown(f'<div class="stage"><span class="tag {TAGS[tag]}">{tag}</span><span>{title}</span>{s}</div>', unsafe_allow_html=True)
+
+
+def purpose(question: str, answer: str, steps, badges: str = ""):
+    """페이지 맨 위 목적 배너: 질문 → 한 줄 답 → 이 페이지가 보여주는 과거/현재/다음. steps=[(태그, 설명)]."""
+    cells = "".join(f'<div class="c"><span class="tag {TAGS[t]}">{t}</span><br>{d}</div>' for t, d in steps)
+    st.markdown(f'<div class="purpose"><div class="q">{question}</div><div>{badges}</div><div class="a">{answer}</div><div class="flow3">{cells}</div></div>',
+                unsafe_allow_html=True)
+
+
+def legend():
+    st.markdown('<div class="legend"><span>근거 등급</span>' + badge("검증됨", "good") + "세 구간(2005–18·2019–22·2023~)에서 같은 방향" + badge("단서", "warn") +
+                "방향은 보이나 약함" + badge("참고", "mid") + "근거 부족·현황만</div>", unsafe_allow_html=True)
 
 
 def freshness(meta: dict):

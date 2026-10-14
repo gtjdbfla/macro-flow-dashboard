@@ -1,4 +1,4 @@
-"""월가 자금: 지금 · 한국으로의 전달 · 과거 · 앞으로(확인 수준별)."""
+"""① 월가 자금: 과거(자금은 어떻게 움직였나) → 현재(지금 어디에 있나) → 다음(확인된 수준별)."""
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,24 +19,62 @@ kh = load("views/korea_model_recent.parquet")
 fh = load("views/flow_history.parquet")
 meta = load("views/meta.json")
 ev = load("views/evidence.json")
+state = load("views/state.json")
 
-st.title("월가 자금")
-st.markdown('<p class="lede">자금이 지금 어느 섹터에 있고, 과거에 어떻게 옮겨 다녔는지 봅니다. 앞날에 대해 통계로 확인된 것은 '
-            '<b>미국 마감이 다음 한국 장에 미치는 영향</b>뿐이고, 나머지는 현황과 단서로만 표시합니다.</p>', unsafe_allow_html=True)
+last = kh.dropna(subset=["pred_foreign_z"]).iloc[-1]
+z = float(last.pred_foreign_z)
+zdir = "순매수 쪽" if z > 0.15 else ("순매도 쪽" if z < -0.15 else "중립")
+
+st.title("① 월가 자금")
+ui.purpose("월가의 돈은 어디에서 어디로 움직였고, 지금 어디에 있고, 다음에 어디로 갈까?",
+           f"지금 매크로 국면은 <b>{state['regime']}</b>({state['days_in_regime']}거래일째)입니다. 통계로 확인된 앞날 정보는 "
+           f"<b>미국 마감 → 다음 한국 장 외국인 수급</b> 하나뿐이고(현재 <b>{zdir}</b>), 섹터 간 자금 이동을 미리 맞히는 신호는 확인되지 않았습니다.",
+           [("과거", "섹터 ETF 자금이 시기별·국면별로 어디로 갔나 (2007~)"),
+            ("현재", "지금 어느 섹터에 자금이 들어오고 빠지나 · 기관 선물 포지션"),
+            ("다음", "미국 → 한국 전달(검증됨) · 약한 단서 · 근거 부족한 것")],
+           badge("한국 전달만 검증됨", "info") + badge("섹터 이동은 약한 단서", "warn"))
+ui.legend()
 ui.freshness(meta)
 
 
-def heat(z, x, y, lim, fmt="{:+.1f}", h=380):
-    fig = go.Figure(go.Heatmap(z=z, x=x, y=y, colorscale="RdYlGn", zmid=0, zmin=-lim, zmax=lim, showscale=False,
-                               text=[[fmt.format(v) for v in row] for row in z], texttemplate="%{text}", xgap=2, ygap=2,
+def heat(zv, x, y, lim, fmt="{:+.1f}", h=380):
+    fig = go.Figure(go.Heatmap(z=zv, x=x, y=y, colorscale="RdYlGn", zmid=0, zmin=-lim, zmax=lim, showscale=False,
+                               text=[[fmt.format(v) for v in row] for row in zv], texttemplate="%{text}", textfont=dict(size=14), xgap=2, ygap=2,
                                hovertemplate="%{y} · %{x}: %{text}<extra></extra>"))
-    fig.update_yaxes(autorange="reversed")
+    fig.update_yaxes(autorange="reversed", tickfont=dict(size=13))
     fig.update_xaxes(side="top")
     plot(fig, h, legend=False)
 
 
-# ── 지금 ────────────────────────────────────────────────────────────────────
-st.header("1. 지금 — 자금은 어디에 있나")
+# ── 과거 ────────────────────────────────────────────────────────────────────
+@st.fragment
+def history():
+    ui.stage("과거", "자금은 섹터 사이를 어떻게 옮겨 다녔나", "기간을 골라 보세요")
+    per = st.segmented_control("기간", ["최근 1년", "3년", "5년", "2007~ 전체"], default="3년", label_visibility="collapsed", key="hist_per")
+    n = {"최근 1년": 52, "3년": 156, "5년": 260, "2007~ 전체": len(fh)}[per or "3년"]
+    d = fh.tail(n)
+    secs = [c for c in d.columns if c != "regime"]
+    codes = {"Goldilocks": 0, "Reflation": 1, "Slowdown": 2, "Stagflation": 3}
+    colors = ["#22a55a", "#e0b41e", "#5b8def", "#ee5555"]
+    rg = d["regime"].map(codes).astype(float)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.07, 0.93], vertical_spacing=0.015)
+    fig.add_trace(go.Heatmap(z=[rg.values], x=d.index, colorscale=[[i / 3, c] for i, c in enumerate(colors)], zmin=0, zmax=3, showscale=False,
+                             text=[d["regime"].fillna("").values], hovertemplate="%{x|%Y-%m-%d} %{text}<extra></extra>"), row=1, col=1)
+    fig.add_trace(go.Heatmap(z=(d[secs].T * 100).clip(-10, 10).values, x=d.index, y=secs, colorscale="RdYlGn", zmid=0, zmin=-10, zmax=10,
+                             colorbar=dict(title="20일 순유입<br>%순자산", len=0.6, thickness=10),
+                             hovertemplate="%{y} %{x|%Y-%m-%d}: %{z:+.1f}%<extra></extra>"), row=2, col=1)
+    fig.update_yaxes(visible=False, row=1, col=1)
+    fig.update_yaxes(autorange="reversed", row=2, col=1)
+    plot(fig, 440, legend=False)
+    st.markdown('<p class="note">행은 섹터 ETF, 색은 최근 20일 순 설정유입(초록=유입, 빨강=유출)입니다. 위쪽 띠는 그 시점의 매크로 국면 '
+                '(초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation). '
+                '국면별로 자금이 일정하게 같은 섹터로 갔다는 패턴은 통계로 확인되지 않았습니다(아래 "다음" 절).</p>', unsafe_allow_html=True)
+
+
+history()
+
+# ── 현재 ────────────────────────────────────────────────────────────────────
+ui.stage("현재", "자금은 지금 어디에 있나", "미국 섹터 ETF · 기관 선물")
 order = sec.sort_values("flow_1m", ascending=False)
 left, right = st.columns([2.1, 1], gap="large")
 with left:
@@ -48,7 +86,7 @@ with left:
         st.markdown("**SPY 대비 상대강도** (%p, 가격)")
         heat((order[["rs_1w", "rs_1m", "rs_3m"]] * 100).values, ["1주", "1개월", "3개월"], list(order["name"]), 8)
     st.markdown('<p class="note">초록이 짙을수록 자금이 들어오거나 시장보다 강한 섹터입니다. 두 가지가 같은 방향이면 신호가 더 믿을 만하고, 엇갈리면 '
-                '가격은 올랐지만 자금은 빠지는 식의 구간입니다. 섹터 자금 신호의 이후 수익 예측력은 아직 확인되지 않았습니다(아래 4절).</p>',
+                '가격은 올랐지만 자금은 빠지는 식의 구간입니다. 섹터 자금 신호의 이후 수익 예측력은 아직 확인되지 않았습니다.</p>',
                 unsafe_allow_html=True)
 with right:
     st.markdown("**기관 선물 포지션** (자산운용사, 이력 대비 백분위)")
@@ -63,11 +101,8 @@ with st.expander("산업·테마 ETF (반도체·은행·바이오·방산 등)"
     st.dataframe(t.rename(columns={"name": "산업", "score": "점수", "direction": "방향", "flow_1m": "1M 순유입%", "rs_1m": "1M RS%p", "rs_1w": "1W RS%p",
                                    "flow_src": "자금 출처"}).round(1), hide_index=True, width="stretch", height=320)
 
-# ── 한국으로의 전달 ─────────────────────────────────────────────────────────
-st.header("2. 한국으로의 전달 — 통계로 확인된 유일한 연결")
-last = kh.dropna(subset=["pred_foreign_z"]).iloc[-1]
-z = float(last.pred_foreign_z)
-zdir = "순매수 쪽" if z > 0.15 else ("순매도 쪽" if z < -0.15 else "중립")
+# ── 다음 ────────────────────────────────────────────────────────────────────
+ui.stage("다음", "한국으로의 전달 — 통계로 확인된 유일한 연결")
 q = quint[quint.period == "oos"]
 ev_k = ev["korea_eval"]["test"]
 st.markdown(badge("검증됨", "good") + badge("표본외 2023~ 기준", "mid"), unsafe_allow_html=True)
@@ -100,34 +135,7 @@ with k3:
     plot(fig, 320, legend=False)
     st.markdown('<p class="note">업종 대표 종목 3~4개 합산(KIS). 대표 종목은 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>', unsafe_allow_html=True)
 
-# ── 과거 ────────────────────────────────────────────────────────────────────
-@st.fragment
-def history():
-    st.header("3. 과거 — 자금은 섹터 사이를 어떻게 옮겨 다녔나")
-    per = st.segmented_control("기간", ["최근 1년", "3년", "5년", "2007~ 전체"], default="3년", label_visibility="collapsed", key="hist_per")
-    n = {"최근 1년": 52, "3년": 156, "5년": 260, "2007~ 전체": len(fh)}[per or "3년"]
-    d = fh.tail(n)
-    secs = [c for c in d.columns if c != "regime"]
-    codes = {"Goldilocks": 0, "Reflation": 1, "Slowdown": 2, "Stagflation": 3}
-    colors = ["#22a55a", "#e0b41e", "#5b8def", "#ee5555"]
-    rg = d["regime"].map(codes).astype(float)
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.07, 0.93], vertical_spacing=0.015)
-    fig.add_trace(go.Heatmap(z=[rg.values], x=d.index, colorscale=[[i / 3, c] for i, c in enumerate(colors)], zmin=0, zmax=3, showscale=False,
-                             text=[d["regime"].fillna("").values], hovertemplate="%{x|%Y-%m-%d} %{text}<extra></extra>"), row=1, col=1)
-    fig.add_trace(go.Heatmap(z=(d[secs].T * 100).clip(-10, 10).values, x=d.index, y=secs, colorscale="RdYlGn", zmid=0, zmin=-10, zmax=10,
-                             colorbar=dict(title="20일 순유입<br>%순자산", len=0.6, thickness=10),
-                             hovertemplate="%{y} %{x|%Y-%m-%d}: %{z:+.1f}%<extra></extra>"), row=2, col=1)
-    fig.update_yaxes(visible=False, row=1, col=1)
-    fig.update_yaxes(autorange="reversed", row=2, col=1)
-    plot(fig, 420, legend=False)
-    st.markdown('<p class="note">행은 섹터 ETF, 색은 최근 20일 순 설정유입(초록=유입, 빨강=유출)입니다. 위쪽 띠는 그 시점의 매크로 국면(초록 Goldilocks · 노랑 Reflation · '
-                '파랑 Slowdown · 빨강 Stagflation). 국면별로 자금이 일정하게 같은 섹터로 갔다는 패턴은 통계로 확인되지 않았습니다(4절).</p>', unsafe_allow_html=True)
-
-
-history()
-
-# ── 앞으로 ──────────────────────────────────────────────────────────────────
-st.header("4. 앞으로 — 확인된 수준별로 구분")
+st.markdown("#### 확인된 수준별 정리")
 kv = ev["korea_eval"]
 trio(
     ev_card(badge("검증됨", "good"), "미국 마감 → 한국 다음 장", "시차 약 1일", "세 구간 모두 같은 방향, 주로 시가 갭으로 나타남",
@@ -138,10 +146,11 @@ trio(
     ev_card(badge("참고", "mid"), "섹터·국면 기반 예측은 근거 부족", f"{ev['regime_rate']*100:.1f}%", f"세 구간에서 모두 재현된 비율 (검정 {ev['regime_testable']:,}건 중 {ev['regime_replicated']}건, 우연 기대 ≈1.25%)",
             [("섹터 상대강도·자금 신호", "구간마다 부호 변동", ""), ("점수 구성요소 채택", f"{ev['score_included']}개", f"/ {ev['score_components']}개")]))
 
+
 @st.fragment
 def analog():
     A = S["analog"]
-    st.subheader("비슷했던 과거 국면 뒤에는 (참고)")
+    st.markdown("#### 비슷했던 과거 국면 뒤에는 (참고)")
     fw = load("results/analog_forward.parquet")
     assets = sorted(fw.asset.unique())
     c1, c2 = st.columns([1, 3])
