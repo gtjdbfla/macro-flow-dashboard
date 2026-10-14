@@ -13,7 +13,7 @@ from src.data import DATA_DIR
 CSS = """
 <style>
 html{font-size:16px}
-.block-container{max-width:1440px;padding:1.2rem 2.6rem 4rem}
+.block-container{max-width:1440px;padding:5rem 2.6rem 4rem}
 [data-testid="stMarkdownContainer"] p,[data-testid="stMarkdownContainer"] li{font-size:1rem;line-height:1.72}
 h1{font-size:2.1rem!important;margin-bottom:.2rem!important}
 h2{font-size:1.5rem!important;margin:1.6rem 0 .6rem!important}
