@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backtest import korea_sector_flow, korea_transmission, lead_lag, regime_backtest, sector_rotation  # noqa: E402
+from backtest import flow_rules, korea_sector_flow, korea_transmission, lead_lag, regime_backtest, sector_rotation  # noqa: E402
 from src.data import DATA_DIR  # noqa: E402
 
 out = DATA_DIR / "results"
@@ -21,4 +21,5 @@ sector_rotation.run().to_parquet(out / "sector_rotation.parquet")
 lead_lag.run().to_parquet(out / "lead_lag.parquet")
 korea_transmission.run().to_parquet(out / "korea_transmission.parquet")
 korea_sector_flow.run().to_parquet(out / "korea_sector_flow.parquet")
+flow_rules.run().to_parquet(out / "flow_rules.parquet")
 print(f"done {time.time() - t0:.0f}s ->", sorted(p.name for p in out.glob('*.parquet')))

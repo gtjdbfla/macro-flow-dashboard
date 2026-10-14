@@ -193,3 +193,50 @@ for mode, what, when, nxt in MODES:
                   "last_warn": ("; ".join(last["warnings"])[:160] if last else "")})
 (V / "schedule.json").write_text(json.dumps(sched, ensure_ascii=False), encoding="utf-8")
 print("sources/schedule built:", [r["status"] for r in rows])
+
+# ── 홈 상세: 섹터 자금(달러), 다음 자금 이동 후보, AI 투자 주체·변화량 ───────────
+from src.features.sector_features import SECTORS as _SEC  # noqa: E402
+
+rows = []
+for sym, lab in _SEC.items():
+    f = PARQUET / f"ssga_{sym}.parquet"
+    if not f.exists():
+        continue
+    d = pd.read_parquet(f)
+    fl = (d["shares"].diff() * d["nav"]).where(d["shares"].pct_change().abs() < 0.4, 0.0)
+    rows.append({"sector": lab, "flow_20d_usd": float(fl.tail(20).sum()), "flow_60d_usd": float(fl.tail(60).sum()),
+                 "tna": float(d["tna"].iloc[-1]), "as_of": str(d.index[-1].date())})
+pd.DataFrame(rows).to_parquet(V / "sector_flow_usd.parquet")
+
+fr = pd.read_parquet(R / "flow_rules.parquet") if (R / "flow_rules.parquet").exists() else pd.DataFrame()
+secn = pd.read_parquet(R / "sector_snapshot.parquet")
+etf = secn[secn.flow_src == "ETF유입"].sort_values("flow_1m", ascending=False)
+krn = pd.read_parquet(V / "kr_sector_now.parquet").sort_values("foreign_60d", ascending=False)
+nxt = {"in_top": etf.head(3)[["name", "flow_1m"]].values.tolist(), "out_top": etf.tail(3).iloc[::-1][["name", "flow_1m"]].values.tolist(),
+       "kr_in_top": krn.head(3)[["sector", "foreign_60d"]].values.tolist(), "kr_out_top": krn.tail(3).iloc[::-1][["sector", "foreign_60d"]].values.tolist(),
+       "rules": fr.to_dict("records")}
+(V / "flow_next.json").write_text(json.dumps(nxt, ensure_ascii=False, default=float), encoding="utf-8")
+
+hist = pd.read_parquet(R / "ai_history.parquet")
+cos = ["AMZN", "GOOGL", "MSFT", "META", "ORCL", "CRWV"]
+NM = {"MSFT": "Microsoft", "GOOGL": "Alphabet", "AMZN": "Amazon", "META": "Meta", "ORCL": "Oracle", "CRWV": "CoreWeave"}
+recs = []
+for t in cos:
+    h = hist[hist.ticker == t].dropna(subset=["capex_ttm"]).sort_values("period_end")
+    if len(h) < 6:
+        continue
+    cur, y1, q2 = h.iloc[-1], h.iloc[-5], h.iloc[-3]
+    recs.append({"ticker": t, "name": NM[t], "period_end": str(cur.period_end.date()), "capex": cur.capex_ttm, "capex_prev": y1.capex_ttm,
+                 "capex_delta": cur.capex_ttm - y1.capex_ttm, "capex_yoy": cur.capex_yoy, "capex_yoy_2q": q2.capex_yoy,
+                 "ocf": cur.ocf_ttm, "ocf_delta": cur.ocf_ttm - y1.ocf_ttm, "capex_ocf": cur.capex_ocf, "capex_ocf_2q": q2.capex_ocf,
+                 "fcf": cur.fcf_ttm, "fcf_delta": cur.fcf_ttm - y1.fcf_ttm, "rev": cur.revenue_ttm, "rev_delta": cur.revenue_ttm - y1.revenue_ttm,
+                 "op": cur.op_income_ttm, "op_delta": cur.op_income_ttm - y1.op_income_ttm, "rev_yoy": cur.rev_yoy, "rev_yoy_2q": q2.rev_yoy})
+ha = pd.DataFrame(recs)
+tot = ha.capex.sum()
+ha["share"] = ha.capex / tot
+ha["delta_share"] = ha.capex_delta / ha.capex_delta.sum()
+ha.to_parquet(V / "home_ai.parquet")
+sq = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
+cq = sq[(sq.metric == "capex") & sq.ticker.isin(cos)][["ticker", "end", "value"]].sort_values("end")
+cq[cq.end >= cq.end.max() - pd.DateOffset(months=27)].to_parquet(V / "ai_capex_q.parquet")
+print("home details built:", len(ha), "companies")
