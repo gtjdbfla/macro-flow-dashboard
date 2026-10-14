@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd  # noqa: E402
 
 from backtest import ai_capex_event  # noqa: E402
+from src.ai import cloud as C  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
 from src.data.yahoo import _fname  # noqa: E402
@@ -28,6 +29,13 @@ for sym, name in [("SOXX", "SOXX"), ("NVDA", "NVDA"), ("000660.KS", "SK하이닉
     if f.exists():
         prices[name] = pd.read_parquet(f)["adjclose"].dropna()
 fl = M.flags(co, prices)
+ch = C.history()
+ch.to_parquet(out / "ai_cloud_history.parquet")
+C.latest(ch, co).to_parquet(out / "ai_cloud_latest.parquet")
+C.aggregate(ch).reset_index().to_parquet(out / "ai_cloud_agg.parquet")
+tw_f = PARQUET / "twse_monthly.parquet"
+tw = pd.read_parquet(tw_f) if tw_f.exists() else None
+fl = sorted(fl + C.flags(ch, tw), key=lambda f: f["id"])
 sec = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
 (out / "ai_flags.json").write_text(json.dumps({"flags": fl, "latest_filed": str(sec["filed"].max().date())},
                                               ensure_ascii=False, indent=1), encoding="utf-8")

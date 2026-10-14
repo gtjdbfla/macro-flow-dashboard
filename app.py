@@ -68,7 +68,7 @@ st.divider()
 
 # ───────────────────────── AI PROFITABILITY ─────────────────────────
 st.header("AI PROFITABILITY")
-st.caption("질문: AI 투자(CAPEX)가 실제 이익·현금흐름으로 돌아오고 있는가? · SEC 공시(분기, 공시일 기준) · 회사 전체 재무이며 AI 전용 수치가 아님(신뢰 등급 C, 수주잔고 RPO만 B)")
+st.caption("질문: AI 투자(CAPEX)가 실제 이익·현금흐름으로 돌아오고 있는가? · SEC 공시(분기, 공시일 기준) · 재무제표는 회사 전체 기준이라 AI 전용 수치가 아님(신뢰 등급 C, 수주잔고 RPO·클라우드 부문 B, 경영진 AI 수치 공개 A)")
 _al, _ah, _af = rd("ai_latest.parquet"), rd("ai_history.parquet"), None
 _p = R / "ai_flags.json"
 if _p.exists():
@@ -102,15 +102,16 @@ if _al is not None and _af is not None:
                "NVIDIA는 투자의 수취자라 CAPEX 효율 열을 비움. 적자 기업의 영업이익 증가율은 '적자'로 표기. RPO 미공시(AMZN·META)는 —.")
     if _ah is not None:
         bh = _ah[(_ah.ticker == "BIG4") & (_ah.period_end >= "2016-01-01")].dropna(subset=["capex_yoy"])
-        tabs = st.tabs(["성장률 비교", "현금 전환", "투자 회수", "수주잔고(RPO)", "최근 5분기 추세"])
-        with tabs[0]:
+        tabs = st.tabs(["클라우드(AWS·Azure·GCP)", "성장률 비교", "현금 전환", "투자 회수", "수주잔고(RPO)", "최근 5분기 추세",
+                        "대만 공급망 월매출", "AI 매출 직접 공개(A)"])
+        with tabs[1]:
             fig = go.Figure()
             for c, n in [("capex_yoy", "CAPEX"), ("rev_yoy", "매출"), ("opinc_yoy", "영업이익"), ("ocf_yoy", "영업현금흐름")]:
                 fig.add_scatter(x=bh.period_end, y=bh[c] * 100, name=n, mode="lines+markers")
             fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="TTM YoY (%)", legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig, width="stretch")
             st.caption("Big4 합계. CAPEX 성장률이 매출·이익 성장률을 크게 앞서는 구간이 투자 선행, 회수 대기 상태.")
-        with tabs[1]:
+        with tabs[2]:
             fig = go.Figure()
             fig.add_bar(x=bh.period_end, y=bh.ocf_ttm / 1e9, name="영업현금흐름 TTM", opacity=.55)
             fig.add_bar(x=bh.period_end, y=bh.capex_ttm / 1e9, name="CAPEX TTM", opacity=.55)
@@ -118,14 +119,14 @@ if _al is not None and _af is not None:
             fig.update_layout(barmode="group", height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="$B",
                               legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig, width="stretch")
-        with tabs[2]:
+        with tabs[3]:
             fig = go.Figure()
             fig.add_scatter(x=bh.period_end, y=bh.opinc_per_capex, name="영업이익 증가 ÷ 1년 전 CAPEX", mode="lines+markers")
             fig.add_scatter(x=bh.period_end, y=bh.rev_per_capex, name="매출 증가 ÷ 1년 전 CAPEX", mode="lines+markers")
             fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="$ per $", legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig, width="stretch")
             st.caption("1년 전 CAPEX 1달러가 이후 1년간 늘린 연 매출·영업이익. 낮아질수록 투자 회수 속도 둔화(비AI 사업 포함).")
-        with tabs[3]:
+        with tabs[4]:
             fig = go.Figure()
             for tk in ("MSFT", "GOOGL", "ORCL", "CRWV"):
                 r = _ah[(_ah.ticker == tk) & (_ah.period_end >= "2022-01-01")].dropna(subset=["rpo"])
@@ -134,7 +135,7 @@ if _al is not None and _af is not None:
             fig.update_layout(height=320, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="RPO $B", legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig, width="stretch")
             st.caption("RPO=계약으로 확정됐지만 아직 매출로 잡히지 않은 금액(수주잔고). 클라우드 수요의 선행 지표(등급 B). 일부는 특정 AI 고객 계약 집중 가능성.")
-        with tabs[4]:
+        with tabs[5]:
             last5 = bh.tail(5).copy()
             tr = pd.DataFrame({"분기": last5.period_end.dt.strftime("%Y-%m"), "CAPEX YoY%": last5.capex_yoy * 100,
                                "매출 YoY%": last5.rev_yoy * 100, "영업이익 YoY%": last5.opinc_yoy * 100,
@@ -142,6 +143,56 @@ if _al is not None and _af is not None:
                                "투자회수": last5.opinc_per_capex}).set_index("분기")
             st.dataframe(tr.round(2), width="stretch")
             st.caption("절대 수준보다 방향이 중요합니다: CAPEX/OCF 상승, FCF 마진 하락, 투자회수 하락이 함께 나타나면 회수 압박.")
+        with tabs[0]:
+            chh, cl, cag = rd("ai_cloud_history.parquet"), rd("ai_cloud_latest.parquet"), rd("ai_cloud_agg.parquet")
+            if chh is not None and cl is not None:
+                shw = pd.DataFrame({
+                    "부문": cl["name"], "기준 분기": cl.quarter_end.dt.strftime("%Y-%m"), "분기 매출 $B": cl.rev_q / 1e3,
+                    "YoY%": cl.yoy * 100, "성장 가속(직전 대비 pp)": cl.yoy_chg_pp, "영업이익률%": cl.margin * 100,
+                    "마진 전년 대비 pp": cl.margin_chg_pp, "Azure 성장%": cl.azure_yoy * 100,
+                    "연환산 매출증가÷1년전 CAPEX": cl.ann_rev_gain_per_capex})
+                st.dataframe(shw.round(1), hide_index=True, width="stretch")
+                c1, c2 = st.columns(2)
+                nm = {"MSFT": "Microsoft IC", "GOOGL": "Google Cloud", "AMZN": "AWS"}
+                with c1:
+                    fig = go.Figure()
+                    for tk, g in chh.groupby("ticker"):
+                        fig.add_scatter(x=g.quarter_end, y=g.yoy * 100, name=nm[tk], mode="lines+markers")
+                    if cag is not None:
+                        fig.add_scatter(x=cag.quarter_end, y=cag.yoy * 100, name="3사 합계", mode="lines", line=dict(dash="dot", color="#94a3b8"))
+                    fig.update_layout(height=300, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="클라우드 매출 YoY (%)", legend=dict(orientation="h", y=1.18))
+                    st.plotly_chart(fig, width="stretch")
+                with c2:
+                    fig = go.Figure()
+                    for tk, g in chh.groupby("ticker"):
+                        fig.add_scatter(x=g.quarter_end, y=g.margin * 100, name=nm[tk], mode="lines+markers")
+                    fig.update_layout(height=300, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="부문 영업이익률 (%)", legend=dict(orientation="h", y=1.18))
+                    st.plotly_chart(fig, width="stretch")
+                st.caption("8-K 실적 발표문의 부문 표를 파싱(AWS 2020-09~, Google Cloud 2023-06~, MSFT Intelligent Cloud 2020-09~). YoY·마진은 각 발표문 안의 당기 vs 전년 동기로 계산. "
+                           "MSFT는 2024-08 부문 재편(과거 값이 소급 재작성), Intelligent Cloud는 Azure만이 아니라 서버·엔터프라이즈 서비스를 포함. "
+                           "일부 분기(MSFT 2025-09·12)는 발표문 표 형식이 달라 반올림된 억 단위 매출을 사용. 마지막 열은 같은 회사 전체 CAPEX 대비라 거친 비교.")
+        with tabs[6]:
+            tw = pd.read_parquet(PARQUET / "twse_monthly.parquet") if (PARQUET / "twse_monthly.parquet").exists() else None
+            if tw is not None and len(tw):
+                lastm = tw.sort_values("month").groupby("ticker").tail(1).sort_values("yoy", ascending=False)
+                from src.data.twse import ROLE
+                tt = pd.DataFrame({"회사": lastm["name"], "역할": [ROLE.get(x, "") for x in lastm.ticker],
+                                   "월": lastm.month.dt.strftime("%Y-%m"), "월매출(십억 NT$)": lastm.rev / 1e6,
+                                   "YoY%": lastm.yoy, "MoM%": lastm.mom, "누적 YoY%": lastm.ytd_yoy})
+                st.dataframe(tt.round(1), hide_index=True, width="stretch")
+                fig = go.Figure(go.Bar(x=lastm["name"].str.split("(").str[0], y=lastm.yoy))
+                fig.update_layout(height=260, margin=dict(l=0, r=0, t=8, b=0), yaxis_title="월매출 YoY (%)")
+                st.plotly_chart(fig, width="stretch")
+                st.caption("TWSE 공개 API(매월 10일경 전월 확정). 하이퍼스케일러 CAPEX가 공급망 매출로 실제 전환되는 속도를 분기 공시보다 1~2개월 빨리 보여준다. "
+                           "수집을 시작한 시점부터 이력이 쌓인다(과거 백필 없음).")
+        with tabs[7]:
+            dp = PARQUET / "ai_disclosures.parquet"
+            if dp.exists():
+                dd = pd.read_parquet(dp).sort_values("filed", ascending=False).head(14)
+                st.dataframe(pd.DataFrame({"회사": dd.ticker, "분기": dd.quarter_end.dt.strftime("%Y-%m"), "경영진 공개 문장(원문)": dd.text}),
+                             hide_index=True, width="stretch")
+                st.caption("등급 A: 회사가 직접 공개한 AI 관련 정량 수치(연환산 매출, 사용량 등). 비표준 지표라 시계열로 합치지 않고 원문 그대로 보여준다. "
+                           "정량 지표와 경영진 발언·전망(감성)은 섞지 않는다.")
     ev = rd("ai_event_study.parquet")
     with st.expander("이 지표는 주가를 예측했나? — 과거 분기별 이벤트 스터디와 한계"):
         if ev is not None:
