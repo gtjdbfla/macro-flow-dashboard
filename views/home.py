@@ -152,7 +152,8 @@ def ai_detail():
     worse = [r["name"] for _, r in t.iterrows() if r.capex_ocf > r.capex_ocf_2q + 0.03]
     better = [r["name"] for _, r in t.iterrows() if r.capex_ocf < r.capex_ocf_2q - 0.03]
     st.markdown(f"- **가장 많이 쓰는 곳**: {by_capex.iloc[0]['name']} ({by_capex.iloc[0].share*100:.0f}%) · **1년간 가장 많이 늘린 곳**: {by_delta.iloc[0]['name']}, {by_delta.iloc[1]['name']} · "
-                f"**가장 빠르게 늘리는 곳**: {t.sort_values('capex_yoy', ascending=False).iloc[0]['name']} (+{t.capex_yoy.max()*100:.0f}%)\n"
+                f"**가장 빠르게 늘리는 곳**: {t.sort_values('capex_yoy', ascending=False).iloc[0]['name']} (+{t.capex_yoy.max()*100:.0f}%) · "
+                f"Oracle의 12개월은 {t[t.ticker == 'ORCL'].period_end.iloc[0][:7]}까지(결산월 차이)\n"
                 f"- **영업현금흐름 대비 부담이 2분기 전보다 커진 곳**: {', '.join(worse) or '없음'} · **줄어든 곳**: {', '.join(better) or '없음'}")
 
     st.markdown("### 변화량 — 1년 전보다 얼마를 더 쓰고, 얼마를 더 벌었나")
@@ -160,7 +161,12 @@ def ai_detail():
     with a:
         st.markdown("**분기별 CAPEX (억 달러)**")
         cqq = cq.copy()
-        cqq["q"] = cqq.end.dt.strftime("%y.%m")
+        # Oracle은 5월 결산이라 분기말이 8·11·2·5월 → 가장 가까운 달력 분기말(9·12·3·6월)로 맞춰 다른 회사와 같은 막대에 쌓는다
+        cqq["qe"] = cqq.end + pd.offsets.QuarterEnd(0)
+        # Big4가 모두 공시하지 않은 마지막 분기는 일부 회사만 있어 오해를 부르므로 그리지 않는다
+        full = cqq[cqq.ticker.isin(["AMZN", "GOOGL", "MSFT", "META"])].groupby("qe").ticker.nunique()
+        cqq = cqq[cqq.qe.isin(full[full == 4].index)]
+        cqq["q"] = cqq.qe.dt.strftime("%y.%m")
         fig = go.Figure()
         for tk, nm in [("AMZN", "Amazon"), ("GOOGL", "Alphabet"), ("MSFT", "Microsoft"), ("META", "Meta"), ("ORCL", "Oracle"), ("CRWV", "CoreWeave")]:
             g = cqq[cqq.ticker == tk]
@@ -169,6 +175,8 @@ def ai_detail():
         fig.update_layout(barmode="stack")
         fig.update_xaxes(type="category")
         plot(fig, 330)
+        st.markdown('<p class="note">Oracle은 결산월이 달라(분기말 8·11·2·5월) 가장 가까운 달력 분기에 맞췄습니다(약 1개월 차이). '
+                    'Big4가 모두 공시한 분기까지만 표시합니다.</p>', unsafe_allow_html=True)
     with b:
         b4 = ha[ha.ticker.isin(["MSFT", "GOOGL", "AMZN", "META"])]
         items = [("CAPEX (쓴 돈)", b4.capex_delta.sum(), "#f97316"), ("영업현금흐름", b4.ocf_delta.sum(), "#5b8def"), ("매출", b4.rev_delta.sum(), "#8a99a3"),
