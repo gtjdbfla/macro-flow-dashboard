@@ -250,7 +250,13 @@ def ai_detail():
         tiles.append(("TSMC 월매출", pct(tsmc.yoy), f"{tsmc.month.strftime('%Y-%m')}, 전년 동월 대비"))
     tiles.append(("클라우드 3사 매출", pct(cl.yoy * 100), "최근 분기, 전년 동기 대비"))
     st.markdown(kpis(tiles), unsafe_allow_html=True)
-    ui.stage("다음", "무엇을 지켜봐야 하나", "예측이 아니라 확인할 항목 · 가정 시나리오는 ② AI 수익성 페이지")
+    ui.stage("다음", "다음 12개월 기준선 전망과 지켜볼 것", "지금 증가율이 이어진다는 단순 가정 · 가정 시나리오는 ② AI 수익성 페이지")
+    fp = load("views/ai_forecast.parquet")
+    if fp is not None:
+        st.markdown(ui.forecast_table(fp), unsafe_allow_html=True)
+        f_ = fp.set_index("metric").loc["fcf"]
+        st.markdown(f'<p class="note">최근 분기 전년동기비 증가율이 최근 4분기 합계에 이어진다는 방법(과거 오차를 범위로 사용). <b>잉여현금흐름은 {f_.now_ttm/1e8:,.0f}억 → 약 {f_.proj/1e8:,.0f}억 달러</b>로 '
+                    '0 부근까지 줄어드는 쪽이며, CAPEX는 최근 실제가 전망보다 컸습니다(위쪽 위험). 근거 등급은 단서입니다.</p>', unsafe_allow_html=True)
     a, b = st.columns(2, gap="large")
     with a:
         st.markdown("**지금 경고·주의 신호**")

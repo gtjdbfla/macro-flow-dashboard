@@ -256,6 +256,22 @@ def grade_table(tests, only_primary=True):
             + "".join(rows) + "</table>")
 
 
+FC_NAMES = {"capex": "CAPEX (투자)", "ocf": "영업현금흐름", "fcf": "잉여현금흐름 (영업현금흐름 − CAPEX)", "revenue": "매출", "op_income": "영업이익"}
+
+
+def forecast_table(fp):
+    """Big4 다음 12개월 기준선 전망 표(HTML)."""
+    rows = []
+    for m in ("revenue", "op_income", "ocf", "capex", "fcf"):
+        r = fp[fp.metric == m].iloc[0]
+        g = "—" if r.growth != r.growth else f"{r.growth*100:+.0f}%"
+        bias = f"{r.bias_recent*100:+.0f}%" + ("p" if m == "fcf" else "")
+        rows.append(f"<tr><td>{FC_NAMES[m]}</td><td class='r'>{r.now_ttm/1e8:,.0f}</td><td class='r'><b>{r.proj/1e8:,.0f}</b></td><td class='r'>{g}</td>"
+                    f"<td class='r'>{r.lo/1e8:,.0f} ~ {r.hi/1e8:,.0f}</td><td class='r'>{bias}</td></tr>")
+    return ("<table class='mini'><tr><th>Big4 합계 (억 달러)</th><th class='r'>최근 12개월</th><th class='r'>다음 12개월 전망</th><th class='r'>증가율</th>"
+            "<th class='r'>범위(과거 오차 ±1배)</th><th class='r'>최근 편향(2023~)</th></tr>" + "".join(rows) + "</table>")
+
+
 def freshness(meta: dict):
     items = [("미국 마감", meta["us_close"]), ("한국 수급", meta["kis_last"]), ("SEC 최신 공시", meta["sec_filed"]),
              ("재무 기준 분기", meta["sec_period"]), ("대만 월매출", meta["twse_month"][:7])]

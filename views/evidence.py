@@ -78,6 +78,17 @@ if aiev is not None:
         st.dataframe(pd.DataFrame({"조건": e.cond, "자산": e.asset, "독립 사례": e.n_eff, "이후 20일 평균%": e["mean"] * 100, "평소 대비 %p": e.excess * 100,
                                    "신뢰구간 하단": e.ci_lo * 100, "신뢰구간 상단": e.ci_hi * 100}).round(1), hide_index=True, width="stretch")
 
+_fe = load("views/ai_forecast_eval.parquet")
+if _fe is not None:
+    with st.expander("AI 다음 12개월 기준선 전망: 방법별 과거 정확도 (Big4 분기 합산)"):
+        _t = _fe[_fe.period.isin(["2016–19", "2020–22", "2023~", "전체"])].copy()
+        _t["값"] = _t.apply(lambda r: f"{r.bias*100:+.0f}% / {r.rmse*100:.0f}%", axis=1)
+        _pv = _t.pivot_table(index=["metric", "method"], columns="period", values="값", aggfunc="first")[["2016–19", "2020–22", "2023~", "전체"]].reset_index()
+        _pv["metric"] = _pv.metric.map({"capex": "CAPEX", "ocf": "영업현금흐름", "revenue": "매출", "op_income": "영업이익", "fcf": "FCF(영업현금흐름 대비 %p)"})
+        st.dataframe(_pv.rename(columns={"metric": "지표", "method": "방법"}), hide_index=True, width="stretch")
+        st.markdown('<p class="note">각 칸은 <b>편향 / RMSE</b>(다음 4분기 합계의 로그 오차). 0에 가까운 편향이 좋습니다. "최근 분기 YoY 지속"이 매출·영업현금흐름·영업이익에서 가장 덜 치우쳤고, '
+                    'CAPEX는 2023년 이후 15% 낮게 맞혔습니다. 방법을 5개 중 최선으로 골랐고 4분기 창이 겹쳐 독립 표본이 약 9개라 등급은 단서입니다.</p>', unsafe_allow_html=True)
+
 st.header("4. 전향 검증 장부")
 L = ev.get("ledger", {})
 if L.get("n_days"):

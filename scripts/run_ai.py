@@ -8,6 +8,7 @@ import pandas as pd  # noqa: E402
 
 from backtest import ai_capex_event  # noqa: E402
 from src.ai import cloud as C  # noqa: E402
+from src.ai import forecast as FC  # noqa: E402
 from src.ai import credit as CR  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
@@ -53,5 +54,10 @@ sec = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
                                               ensure_ascii=False, indent=1), encoding="utf-8")
 ev = ai_capex_event.run()
 ev.to_parquet(out / "ai_event_study.parquet")
+fe, fp, fn = FC.run()
+fe.to_parquet(out / "ai_forecast_eval.parquet")
+fp.to_parquet(out / "ai_forecast.parquet")
+fn.to_parquet(out / "ai_forecast_negatives.parquet")
+print("forecast:", fp[["metric", "now_ttm", "proj", "growth"]].round(2).values.tolist())
 print("flags:", [(f["id"], f["level"]) for f in fl])
 print("event rows:", len(ev))

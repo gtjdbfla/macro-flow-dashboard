@@ -90,7 +90,7 @@ ev = {"regime_testable": int(len(t)), "regime_train_sig": int(t.train_sig.sum())
       "korea_eval": summary["korea_model"]["eval"], "oos_ic": {k: v["test"]["ic"] for k, v in summary["oos_ic"].items()},
       "ledger": summary.get("ledger", {}), "score_components": int(len(pd.read_parquet(R / "score_validation.parquet"))),
       "score_included": int(pd.read_parquet(R / "score_validation.parquet").included.sum())}
-for _n in ("evidence_tests", "evidence_conditions", "korea_model_v2"):
+for _n in ("evidence_tests", "evidence_conditions", "korea_model_v2", "ai_forecast", "ai_forecast_eval", "ai_forecast_negatives"):
     if (R / f"{_n}.parquet").exists():
         pd.read_parquet(R / f"{_n}.parquet").to_parquet(V / f"{_n}.parquet")
 if (R / "evidence_now.json").exists():

@@ -118,7 +118,39 @@ with d:
         st.markdown('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>", unsafe_allow_html=True)
 
 # ── 다음 ────────────────────────────────────────────────────────────────────
-ui.stage("다음", "앞으로 — 예측이 아니라 두 가지 도구")
+ui.stage("다음", "앞으로 — 다음 12개월 기준선 전망과 두 가지 도구")
+fp = load("views/ai_forecast.parquet")
+fe = load("views/ai_forecast_eval.parquet")
+fn = load("views/ai_forecast_negatives.parquet")
+if fp is not None:
+    P = fp.set_index("metric")
+    _e = pd.Timestamp(P.loc["capex"].last_q_end)
+    st.markdown(badge("기준선 전망", "info") + badge("단서", "warn") + f"**Big4 다음 12개월 ({(_e + pd.offsets.MonthBegin(1)):%Y-%m} ~ {(_e + pd.DateOffset(months=12)):%Y-%m})**", unsafe_allow_html=True)
+    fc = P.loc["fcf"]
+    st.markdown(f'<p class="lede">지금 증가율이 그대로 이어지면 다음 12개월에 Big4는 <b>CAPEX {P.loc["capex"].proj/1e8:,.0f}억 달러(+{P.loc["capex"].growth*100:.0f}%)</b>, '
+                f'매출 {P.loc["revenue"].proj/1e8:,.0f}억(+{P.loc["revenue"].growth*100:.0f}%), 영업현금흐름 {P.loc["ocf"].proj/1e8:,.0f}억(+{P.loc["ocf"].growth*100:.0f}%)입니다. '
+                f'그러면 <b>잉여현금흐름은 {fc.now_ttm/1e8:,.0f}억 → 약 {fc.proj/1e8:,.0f}억 달러</b>(범위 {fc.lo/1e8:,.0f} ~ {fc.hi/1e8:,.0f})로 0 부근까지 줄어듭니다. '
+                f'가장 최근 분기({_e:%Y-%m})만 보면 이미 영업현금흐름 {P.loc["ocf"].last_q/1e8:,.0f}억 − CAPEX {P.loc["capex"].last_q/1e8:,.0f}억 = 약 {fc.last_q/1e8:,.0f}억 달러입니다.</p>', unsafe_allow_html=True)
+    f1, f2 = st.columns([1.25, 1], gap="large")
+    with f1:
+        st.markdown(ui.forecast_table(fp), unsafe_allow_html=True)
+        st.markdown('<p class="note"><b>방법</b>: 최근 분기의 전년동기비 증가율이 최근 4분기 합계에 그대로 이어진다고 가정. 5개 단순 방법을 같은 원점에서 비교해 가장 덜 치우친 것을 골랐고, '
+                    '그 방법의 과거 오차(RMSE)를 범위 폭으로 씁니다. 4분기 창이 겹쳐 독립 표본은 약 9개라 범위는 거친 추정입니다. '
+                    '<b>CAPEX는 2023년 이후 실제가 전망보다 약 15% 컸고</b>(위쪽 위험), FCF 전망은 최근 실제보다 높게 나오는 경향(12%p)이 있어 아래쪽 위험이 있습니다.</p>', unsafe_allow_html=True)
+    with f2:
+        names = ["CAPEX", "영업현금흐름", "잉여현금흐름"]
+        keys = ["capex", "ocf", "fcf"]
+        fig = go.Figure()
+        fig.add_bar(name="최근 12개월", x=names, y=[P.loc[k].now_ttm / 1e8 for k in keys], marker_color="#8a99a3")
+        fig.add_bar(name="다음 12개월 전망", x=names, y=[P.loc[k].proj / 1e8 for k in keys], marker_color="#5b8def",
+                    error_y=dict(type="data", symmetric=False, array=[(P.loc[k].hi - P.loc[k].proj) / 1e8 for k in keys], arrayminus=[(P.loc[k].proj - P.loc[k].lo) / 1e8 for k in keys]))
+        fig.update_layout(barmode="group")
+        plot(fig, 300)
+    if fn is not None:
+        with st.expander("더 정교한 예측 변수는 기준선을 넘지 못했습니다 (수주잔고·NVIDIA 매출·평균회귀 모델)"):
+            st.dataframe(pd.DataFrame({"검정": fn.test, "표본": fn.n, "결과": fn.result, "판정": fn.verdict, "이유": fn.why}), hide_index=True, width="stretch")
+    st.markdown('<p class="note">아래 두 도구는 이 기준선 대신 <b>직접 가정</b>을 넣어 보는 시나리오(왼쪽)와, 다음에 확인될 선행 지표(오른쪽)입니다.</p>', unsafe_allow_html=True)
+
 st.markdown('<p class="note">이 지표들은 주가를 예측한 적이 없습니다(이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못함). '
             '대신 가정을 직접 넣어 결과를 보는 산식 시나리오와, 다음에 확인될 선행 지표를 제공합니다.</p>', unsafe_allow_html=True)
 e1, e2 = st.columns(2, gap="large")
