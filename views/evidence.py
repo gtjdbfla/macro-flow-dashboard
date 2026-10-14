@@ -67,32 +67,7 @@ if L.get("n_days"):
             ("H4 미국 섹터 ETF 순유입이 클수록 이후 상대수익이 낮다", L.get("h4_us_flow", {}).get("n_matured", 0), "비겹침 12개, IC −0.05 이하")]
     st.dataframe(pd.DataFrame(rows, columns=["가설", "실현된 표본", "판정 조건"]), hide_index=True, width="stretch")
 
-st.header("5. 자동 갱신 상태")
-stt = load("status.json")
-if stt is None:
-    st.write("아직 자동 갱신 기록이 없습니다.")
-else:
-    st.markdown((badge("정상", "good") if stt["ok"] else badge("문제 있음", "bad")) + f"마지막 실행 {stt['finished'][:16]} UTC · {stt['mode']} 모드 · {stt['duration_s']}초", unsafe_allow_html=True)
-    if stt["warnings"]:
-        st.write("주의: " + "; ".join(stt["warnings"]))
-    st.dataframe(pd.DataFrame(stt["steps"]).rename(columns={"name": "단계", "ok": "성공", "seconds": "초", "tail": "오류 내용"}), hide_index=True, width="stretch")
-    hp = ui.DATA_DIR / "status_history.jsonl"
-    if hp.exists():
-        import json as _j
-        rows = [_j.loads(x) for x in hp.read_text(encoding="utf-8").splitlines()[-12:]]
-        st.dataframe(pd.DataFrame(rows).iloc[::-1].assign(warnings=lambda d: d.warnings.map(lambda w: "; ".join(w)))
-                     .rename(columns={"mode": "모드", "started": "시작(UTC)", "duration_s": "소요(초)", "ok": "성공", "warnings": "주의"}), hide_index=True, width="stretch")
-    st.markdown('<p class="note">매일 한국 장 마감 후(07:40 UTC)와 미국 마감 후(22:30 UTC) 월~금 실행. 실패하면 이전 결과를 그대로 두고, 텔레그램 설정이 있으면 알림을 보냅니다.</p>', unsafe_allow_html=True)
-
-st.header("6. 데이터 출처와 갱신")
-if cov:
-    rows = []
-    for src, v in cov.items():
-        s = v.get("series", {})
-        starts = [x.get("start") for x in s.values() if x.get("start")]
-        ends = [x.get("end") for x in s.values() if x.get("end")]
-        rows.append({"소스": src, "시리즈": len(s), "오류": sum("error" in x for x in s.values()), "가장 이른 시작": min(starts) if starts else "—",
-                     "가장 늦은 데이터": max(ends) if ends else "—", "마지막 수집(UTC)": (v.get("updated") or "")[:16]})
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", height=330)
+st.header("5. 데이터 출처와 갱신")
+st.markdown("갱신 일정, 소스별 신선도, 최근 실행 이력은 **갱신 현황** 페이지에서 봅니다.")
 st.markdown('<p class="note">전체 방법론·규칙: GitHub gtjdbfla/macro-flow-dashboard 의 docs/DESIGN · FEATURES · BACKTEST · RESULTS_SUMMARY · AI_PROFITABILITY · FORWARD_TEST.</p>',
             unsafe_allow_html=True)

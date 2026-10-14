@@ -101,3 +101,95 @@ meta = {"us_close": summary["as_of"], "kis_last": str(kis.index[-1].date()), "se
         "updated": {k: v.get("updated") for k, v in cov.items()}}
 (V / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 print("views:", sorted(p.name for p in V.glob("*")), "| size KB:", sum(p.stat().st_size for p in V.glob("*")) // 1024)
+
+# ── 갱신 현황: 소스별 신선도 + 실행 일정 ──────────────────────────────────────
+import datetime as _dt  # noqa: E402
+
+today = _dt.datetime.now(_dt.timezone.utc).date()
+
+
+def _pq(name, col, how="max"):
+    try:
+        d = pd.read_parquet(PARQUET / name)
+        v = d.index.max() if col == "index" else d[col].max()
+        return pd.Timestamp(v).date()
+    except Exception:
+        return None
+
+
+def _fred_end():
+    ends = [x.get("end") for x in cov.get("fred", {}).get("series", {}).values() if x.get("end")]
+    return _dt.date.fromisoformat(max(ends)) if ends else None
+
+
+# (키, 내용, 갱신 주기, 허용 경과일, 데이터 최신일)
+SRC = [
+    ("yahoo", "가격: 미국·한국 지수·ETF·종목·환율", "매 영업일 · 미국 마감 후", 4, _pq("px_SPY.parquet", "index")),
+    ("kis", "한국 시장 투자자 수급(외국인·기관·개인)", "매 영업일 · 한국 장 마감 후", 5, _pq("kis_investor_kospi.parquet", "index")),
+    ("kis_stocks", "한국 업종 대표 종목 수급", "매 영업일 · 한국 장 마감 후", 5, _pq("kis_stock_005930.parquet", "index")),
+    ("cftc", "CFTC 선물 포지션(기관)", "주 1회 · 화요일 기준, 금요일 공표", 11, _pq("cftc_tff.parquet", "date")),
+    ("fred", "FRED 금리·유동성·거시", "일별~월별 시리즈 혼합", 5, _fred_end()),
+    ("ssga", "SPDR ETF 설정·환매(발행좌수)", "매 영업일", 5, _pq("ssga_XLK.parquet", "index")),
+    ("sec", "SEC 분기 재무(CAPEX·현금흐름)", "분기 · 실적 시즌(1·4·7·10월 말)", 100, _pq("sec_quarterly.parquet", "filed")),
+    ("cloud", "클라우드 부문·AI 수치(8-K 발표문)", "분기 · 실적 발표일", 100, _pq("cloud_segments.parquet", "filed")),
+    ("debt", "채권 신규 발행 조건(SEC)", "발행 시(불규칙)", 120, _pq("debt_issuance.parquet", "filed")),
+    ("twse", "대만 AI 공급망 월매출", "월 1회 · 매월 10일경", 45, _pq("twse_monthly.parquet", "month")),
+]
+rows = []
+for key, label, cadence, tol, end in SRC:
+    c = cov.get(key, {})
+    series = c.get("series", {})
+    n_err = sum("error" in x for x in series.values())
+    age = (today - end).days if end else None
+    if c.get("error") or (series and n_err == len(series)):
+        status, note = "오류", c.get("error") or "전 시리즈 오류"
+    elif series and n_err / len(series) > 0.3:
+        status, note = "일부 오류", f"시리즈 {n_err}/{len(series)} 오류"
+    elif age is None:
+        status, note = "데이터 없음", ""
+    elif age > tol:
+        status, note = "지연", f"허용 {tol}일 초과"
+    else:
+        status, note = "정상", f"시리즈 {len(series)}개" + (f", 오류 {n_err}" if n_err else "")
+    rows.append({"source": key, "content": label, "cadence": cadence, "last_run_utc": (c.get("updated") or "")[:16].replace("T", " "),
+                 "data_end": str(end) if end else "—", "age_days": age, "tolerance": tol, "status": status, "note": note})
+pd.DataFrame(rows).to_parquet(V / "sources.parquet")
+
+
+def _next(now, hh, mm, weekdays):
+    for d in range(0, 9):
+        t = (now + _dt.timedelta(days=d)).replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if t > now and t.weekday() in weekdays:
+            return t
+    return None
+
+
+def _next_filings(now):
+    season = (1, 4, 7, 10)
+    t = now.replace(minute=15, second=0, microsecond=0)
+    for _ in range(24 * 120):
+        t += _dt.timedelta(hours=1)
+        if t > now and t.month in season and 15 <= t.day <= 31 and t.hour % 3 == 0:
+            return t
+    return None
+
+
+utc = _dt.timezone.utc
+nowu = _dt.datetime.now(utc)
+MODES = [
+    ("kr", "한국 수급 갱신 → 분석·화면 갱신", "월~금 16:40 KST", _next(nowu, 7, 40, {0, 1, 2, 3, 4})),
+    ("us", "미국 가격·거시·ETF·공시·채권 갱신 → 분석·화면 갱신 (대만 월매출은 매월 10~12일)", "월~금 07:30 KST(미국 마감 후)", _next(nowu, 22, 30, {0, 1, 2, 3, 4})),
+    ("weekly", "백테스트·검증 통계 재계산", "일요일 18:00 KST", _next(nowu, 9, 0, {6})),
+    ("filings", "실적 시즌 새 공시 확인(있을 때만 분석 갱신)", "1·4·7·10월 15~31일, 3시간마다", _next_filings(nowu)),
+]
+sched = []
+for mode, what, when, nxt in MODES:
+    p = DATA_DIR / f"status_{mode}.json"
+    last = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    sched.append({"mode": mode, "what": what, "when": when,
+                  "next_kst": (nxt + _dt.timedelta(hours=9)).strftime("%m-%d %H:%M") if nxt else "—",
+                  "last_kst": (pd.Timestamp(last["finished"]) + pd.Timedelta(hours=9)).strftime("%m-%d %H:%M") if last else "아직 없음",
+                  "last_ok": (None if not last else bool(last["ok"])), "last_s": (None if not last else last["duration_s"]),
+                  "last_warn": ("; ".join(last["warnings"])[:160] if last else "")})
+(V / "schedule.json").write_text(json.dumps(sched, ensure_ascii=False), encoding="utf-8")
+print("sources/schedule built:", [r["status"] for r in rows])
