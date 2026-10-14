@@ -195,7 +195,13 @@ _STRIP = re.compile(r"(?<![A-Za-z])(INC|CORP|CORPORATION|CO|PLC|LTD|HOLDINGS?|CL
 def short_name(n: str) -> str:
     """ETF 보유 종목명의 법인 접미사·주식 종류를 떼어 짧게."""
     t = _STRIP.sub(" ", n.replace("/", " ").replace("+", "&")).strip(" &")
-    return " ".join(w.capitalize() if len(w) > 3 else w for w in t.split())
+    ws = t.split()
+    if len(ws) > 1 and ws[-1] in ("A", "B", "C"):
+        ws = ws[:-1]
+    out = []
+    for w in ws:
+        out.append(w.lower() if w in ("OF", "AND") else w.capitalize() if len(w) > 3 else w)
+    return re.sub(r" S", "'s", " ".join(out))
 
 
 def holdings_table(hd, sector_order):
