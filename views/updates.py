@@ -19,9 +19,11 @@ n_ok = int((src.status == "정상").sum())
 bad = src[src.status != "정상"]
 c = st.columns(3)
 c[0].metric("정상 데이터 소스", f"{n_ok} / {len(src)}")
-c[1].metric("확인 필요", f"{len(bad)}", ", ".join(bad.source) if len(bad) else "없음", delta_color="off")
+c[1].metric("확인 필요", f"{len(bad)}")
+c[1].caption(", ".join(bad.source) if len(bad) else "지연·오류 없음")
 last_full = None if stt is None else (pd.Timestamp(stt["finished"]) + pd.Timedelta(hours=9)).strftime("%m-%d %H:%M")
-c[2].metric("마지막 전체 갱신", last_full or "아직 없음", None if stt is None else ("정상 완료" if stt["ok"] else "문제 있음"), delta_color="off")
+c[2].metric("마지막 전체 갱신(KST)", last_full or "아직 없음")
+c[2].caption("" if stt is None else ("정상 완료" if stt["ok"] else "문제 있음"))
 if stt and not stt["ok"]:
     st.warning("마지막 갱신에 문제가 있었습니다: " + "; ".join(stt["warnings"])[:400])
 
