@@ -50,7 +50,7 @@ if dbt_f.exists():
         pr2["CRWV"] = pd.read_parquet(f_)["adjclose"].dropna()
     cr_fl = CR.flags(dd, pr2)
 try:
-    s_lt, s_mh, s_val, s_ro, s_rc, s_oas, s_fl, s_mat, s_valn = SF.run()
+    s_lt, s_mh, s_val, s_ro, s_rc, s_oas, s_fl, s_mat, s_valn, s_hs, s_imp, s_sim, s_tr = SF.run()
     s_lt.to_parquet(out / "ai_safety_latest.parquet")
     s_mh.to_parquet(out / "ai_merton_history.parquet")
     s_val.to_parquet(out / "ai_merton_vs_issued.parquet")
@@ -59,6 +59,11 @@ try:
     s_oas.to_parquet(out / "ai_credit_oas.parquet")
     s_mat.to_parquet(out / "ai_debt_maturity.parquet")
     s_valn.to_parquet(out / "ai_valuation.parquet")
+    s_hs.to_parquet(out / "ai_safety_history.parquet")
+    s_imp.to_parquet(out / "ai_safety_impact.parquet")
+    s_sim.to_parquet(out / "ai_fin_inputs.parquet")
+    s_tr.to_parquet(out / "ai_transmission.parquet")
+    (out / "ai_transmission.json").write_text(json.dumps(s_tr.attrs.get("concurrent", {}), ensure_ascii=False), encoding="utf-8")
 except Exception as e:  # 안전성 지표 실패가 나머지 AI 계산을 막지 않게 한다
     print("safety 실패:", e)
     s_fl = []

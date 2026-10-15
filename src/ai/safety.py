@@ -34,6 +34,19 @@ def _latest(q, tk, metric, asof=None):
     return pd.Timestamp(r.end), float(r.value)
 
 
+def _carry_reliable(q, tk) -> bool:
+    """'DebtInstrumentCarryingAmount'가 총부채인지(CoreWeave) 일부 항목인지(Oracle)를, 구성 항목(비유동+유동) 합과 겹치는 분기에서 비교해 판정한다."""
+    def ser(m):
+        d = q[(q.ticker == tk) & (q.metric == m)].sort_values(["end", "filed"]).drop_duplicates("end", keep="first")
+        return d.set_index("end").value
+    nc, c, cr = ser("debt_nc"), ser("debt_c"), ser("debt_carry")
+    ends = [e for e in cr.index if e in nc.index]
+    if len(ends) < 2:
+        return False
+    diffs = [abs(cr[e] - (nc[e] + (c.get(e, 0.0)))) / max(nc[e] + c.get(e, 0.0), 1.0) for e in ends]
+    return float(np.median(diffs)) < 0.05
+
+
 def balance_sheet(q, tk, asof=None) -> dict:
     """공시일(asof 이전) 기준 최신 대차대조표 항목. 항목별 기준일을 함께 반환한다."""
     g = lambda m: _latest(q, tk, m, asof)  # noqa: E731
@@ -42,10 +55,10 @@ def balance_sheet(q, tk, asof=None) -> dict:
     if nc:
         cc = c[1] if (c and abs((c[0] - nc[0]).days) < 100) else 0.0
         comp = (nc[0], nc[1] + cc)
-    if carry and (not comp or carry[0] >= comp[0]):
-        debt = carry
+    if carry and _carry_reliable(q, tk) and (not comp or carry[0] > comp[0]):
+        debt = carry            # 총부채 태그가 믿을 만한 회사에서, 구성 항목보다 최신일 때만
     else:
-        debt = comp
+        debt = comp or carry
     cash, sti, csti = g("cash"), g("st_inv"), g("cash_sti")
     if csti and (not cash or csti[0] >= cash[0]):
         cash_v = csti
@@ -221,6 +234,140 @@ def roic_by_company() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def history(start="2023-03-31") -> pd.DataFrame:
+    """분기별(공시일 기준 point-in-time) 안전성 추세. ORCL·CRWV·Big4 각사와 Big4 합계.
+    debt_funded = 최근 4분기 순부채(리스 포함) 증가 ÷ CAPEX(12개월): CAPEX 중 외부 자금(빚·리스)로 댄 몫."""
+    q = _q()
+    H = pd.read_parquet(DATA_DIR / "results" / "ai_history.parquet")
+    out = []
+    for tk in ["ORCL", "CRWV", "MSFT", "GOOGL", "AMZN", "META"]:
+        h = H[H.ticker == tk].sort_values("period_end")
+        for _, r in h[pd.to_datetime(h.period_end) >= start].iterrows():
+            pe = pd.Timestamp(r.period_end)
+            asof = pd.Timestamp(r.available) if pd.notna(r.available) else pe + pd.Timedelta(days=45)
+            b = balance_sheet(q, tk, asof=asof)
+            if not b["debt"] or not b["cash"] or b["debt"][0] < pe - pd.Timedelta(days=20) or not np.isfinite(r.op_income_ttm):
+                continue
+            lease = (b["op_lease"][1] if b["op_lease"] else 0.0) + (b["fin_lease"][1] if b["fin_lease"] else 0.0)
+            due = b["due12"][1] if b["due12"] else 0.0
+            need = max(0.0, -r.fcf_ttm) + due
+            out.append({"ticker": tk, "pe": pe + pd.offsets.QuarterEnd(0), "debt": b["debt"][1], "lease": lease, "cash": b["cash"][1], "interest": b["interest_ttm"],
+                        "ebit": float(r.op_income_ttm), "ocf": float(r.ocf_ttm), "capex": float(r.capex_ttm), "fcf": float(r.fcf_ttm), "due": due, "need": need})
+    d = pd.DataFrame(out)
+    big = d[d.ticker.isin(["MSFT", "GOOGL", "AMZN", "META"])]
+    cnt = big.groupby("pe").ticker.nunique()
+    bsum = big[big.pe.isin(cnt[cnt == 4].index)].groupby("pe")[["debt", "lease", "cash", "interest", "ebit", "ocf", "capex", "fcf", "due", "need"]].sum().reset_index()
+    bsum["ticker"] = "BIG4"
+    d = pd.concat([d[d.ticker.isin(["ORCL", "CRWV"])], bsum], ignore_index=True).sort_values(["ticker", "pe"])
+    d["net"] = d.debt + d.lease - d.cash
+    d["runway"] = np.where(d.need > 0, d.cash / d.need.where(d.need > 0), np.inf)
+    d["cov"] = d.ebit / d.interest.where(d.interest > 0)
+    d["int_ebit"] = d.interest / d.ebit.where(d.ebit > 0)
+    d["nd_ocf"] = d.net / d.ocf.where(d.ocf > 0)
+    d["eff_rate"] = d.interest / d.groupby("ticker").debt.transform(lambda x: (x + x.shift(4)) / 2)
+    d["debt_funded"] = d.groupby("ticker").net.diff(4) / d.capex
+    return d.reset_index(drop=True)
+
+
+def impact(hs: pd.DataFrame) -> pd.DataFrame:
+    """금융 조건이 이익에 전달되는 정도: 이자 부담, 외부 자금 의존, 실효 금리, 1년 전 대비 변화."""
+    rows = []
+    for tk, nm in [("BIG4", "Big4 합계"), ("ORCL", "Oracle"), ("CRWV", "CoreWeave")]:
+        g = hs[hs.ticker == tk].sort_values("pe")
+        if len(g) < 5:
+            continue
+        a, b = g.iloc[-1], g.iloc[-5]
+        rows.append({"ticker": tk, "name": nm, "pe": a.pe, "interest": a.interest, "interest_yoy": a.interest / b.interest - 1 if b.interest > 0 else np.nan,
+                     "ebit_yoy": a.ebit / b.ebit - 1 if b.ebit > 0 else np.nan, "int_ebit": a.int_ebit, "int_ebit_1y": b.int_ebit, "int_ocf": a.interest / a.ocf if a.ocf > 0 else np.nan,
+                     "debt_funded": a.debt_funded, "eff_rate": a.eff_rate, "eff_rate_1y": b.eff_rate, "net_chg": a.net - b.net, "capex": a.capex,
+                     "cov": a["cov"], "cov_1y": b["cov"], "runway": a.runway, "runway_1y": b.runway, "nd_ocf": a.nd_ocf, "nd_ocf_1y": b.nd_ocf})
+    return pd.DataFrame(rows)
+
+
+def sim_inputs(lt: pd.DataFrame, hs: pd.DataFrame) -> pd.DataFrame:
+    """자금 조달 시나리오의 출발값: 부채·현금·영업이익·이자·실효금리·신규 조달 금리(최근 발행 쿠폰)·최근 분기 속도 FCF·상환 사다리."""
+    iss = pd.read_parquet(PARQUET / "debt_issuance.parquet") if (PARQUET / "debt_issuance.parquet").exists() else pd.DataFrame()
+    lad = maturity_ladder()
+    rows = []
+    for tk in BORROWERS:
+        x = lt[lt.ticker == tk].iloc[0]
+        g = hs[hs.ticker == tk].sort_values("pe").iloc[-1]
+        cp = iss[(iss.ticker == tk) & (iss.kind == "debt") & (iss.currency == "USD")].dropna(subset=["coupon"]).sort_values("filed").tail(3).coupon
+        new_rate = float(cp.mean()) / 100 if len(cp) else 0.06
+        l = lad[lad.ticker == tk].set_index("bucket").amount
+        rows.append({"ticker": tk, "name": NAMES[tk], "debt": x.debt, "cash": x.cash, "ebit": float(g.ebit), "interest": float(x.interest_ttm),
+                     "old_rate": float(x.interest_ttm / x.debt) if x.debt > 0 else 0.05, "new_rate": new_rate, "fcf_runrate": float(x.fcf_runrate), "fcf_ttm": float(x.fcf_ttm),
+                     **{f"mat{i}": float(l.get(b, 0.0)) for i, b in enumerate(["1년 이내", "2년차", "3년차", "4년차", "5년차"], start=1)}})
+    return pd.DataFrame(rows)
+
+
+def simulate(inp: dict, fcf_annual: float, fcf_improve: float = 0.0, new_rate: float = None, old_rate: float = None, ebit_improve: float = 0.0,
+             min_cash: float = None, years: int = 5) -> pd.DataFrame:
+    """신규 조달 없이는 못 버티는 구조가 5년 이어질 때의 경로(산식 시나리오, 예측 아님).
+    FCF(이미 현재 이자를 반영한 값)에서 '신규 부채의 이자 − 상환된 기존 부채의 이자 절감'을 더 빼고, 원금 만기를 갚은 뒤 최소 현금이 모자라면 신규 차입한다."""
+    nr = inp["new_rate"] if new_rate is None else new_rate
+    orr = inp["old_rate"] if old_rate is None else old_rate
+    cash, d_old, d_new, repaid = inp["cash"], inp["debt"], 0.0, 0.0
+    floor = inp["cash"] if min_cash is None else min_cash
+    rows = []
+    for k in range(1, years + 1):
+        mat = min(inp[f"mat{k}"], d_old)
+        extra_int = nr * d_new - orr * repaid
+        fcf = fcf_annual + fcf_improve * (k - 1) - extra_int
+        pre = cash + fcf - mat
+        borrow = max(0.0, floor - pre)
+        cash = pre + borrow
+        d_old -= mat
+        repaid += mat
+        d_new += borrow
+        debt = d_old + d_new
+        interest = orr * d_old + nr * d_new
+        ebit = inp["ebit"] + ebit_improve * k
+        rows.append({"year": k, "fcf": fcf, "maturity": mat, "borrow": borrow, "debt": debt, "cash": cash, "interest": interest, "ebit": ebit,
+                     "cov": ebit / interest if interest > 0 else np.nan, "int_ebit": interest / ebit if ebit > 0 else np.nan})
+    return pd.DataFrame(rows)
+
+
+def transmission() -> pd.DataFrame:
+    """차입 의존 기업·신용시장의 스트레스가 이후 AI 공급망(NVDA·SOXX) 수익을 앞서는가. 시계열 상관(순위)·겹침 보정 유효표본."""
+    def px(sym):
+        return pd.read_parquet(PARQUET / _fname(sym))["adjclose"].dropna()
+    spy, soxx, nvda = px("SPY"), px("SOXX"), px("NVDA")
+    H = 20
+    fwd = lambda x: x.shift(-H) / x - 1  # noqa: E731
+    rows = []
+
+    def test(label, sig, tgt, tname):
+        d = pd.concat([sig.rename("x"), tgt.rename("y")], axis=1).dropna()
+        d["xr"] = d.x.expanding(60).rank(pct=True)
+        d = d.dropna()
+        if len(d) < 100:
+            return
+        c = float(d.xr.corr(d.y))
+        ne = len(d) / H
+        t = c * np.sqrt((ne - 2) / (1 - c ** 2))
+        half = len(d) // 2
+        rows.append({"signal": label, "target": tname, "n": len(d), "n_eff": ne, "corr": c, "t": float(t),
+                     "corr_h1": float(d.xr.iloc[:half].corr(d.y.iloc[:half])), "corr_h2": float(d.xr.iloc[half:].corr(d.y.iloc[half:]))})
+    for tk, nm in (("ORCL", "Oracle"), ("CRWV", "CoreWeave")):
+        p = px(tk)
+        rel = (p / p.shift(20)) / (spy / spy.shift(20)) - 1
+        for tg, t in (("NVIDIA", nvda), ("SOXX", soxx)):
+            test(f"{nm} 직전 20일 상대수익(SPY 대비)", rel, fwd(t.reindex(rel.index).ffill()), f"{tg} 이후 20일")
+    for sid, nm in (("BAMLH0A3HYC", "CCC 스프레드"), ("BAMLH0A0HYM2", "HY 스프레드")):
+        f = PARQUET / f"fred_{sid}.parquet"
+        if f.exists():
+            sig = pd.read_parquet(f).iloc[:, 0].diff(20)
+            for tg, t in (("NVIDIA", nvda), ("SOXX", soxx)):
+                test(f"{nm} 20일 변화(확대=스트레스)", sig, fwd(t.reindex(sig.index).ffill()), f"{tg} 이후 20일")
+    r = pd.concat([px("CRWV").pct_change().rename("CRWV"), px("ORCL").pct_change().rename("ORCL"), nvda.pct_change().rename("NVIDIA"), soxx.pct_change().rename("SOXX")], axis=1).dropna()
+    r = r[r.index >= "2025-04-01"]
+    c = r.corr()
+    out = pd.DataFrame(rows)
+    out.attrs["concurrent"] = {"CRWV-NVIDIA": float(c.loc["CRWV", "NVIDIA"]), "ORCL-NVIDIA": float(c.loc["ORCL", "NVIDIA"]), "CRWV-SOXX": float(c.loc["CRWV", "SOXX"]), "ORCL-SOXX": float(c.loc["ORCL", "SOXX"])}
+    return out
+
+
 def maturity_ladder() -> pd.DataFrame:
     """공시된 원금 상환 일정(10-K 기준 최신): 1년 이내·2~5년·5년 초과. 차입 의존 기업과 빅테크를 같이 본다."""
     q = _q()
@@ -319,4 +466,5 @@ def run():
     ro = incremental_roic()
     rc = roic_by_company()
     oas = oas_now()
-    return lt, mh, val, ro, rc, oas, flags(lt, mh, ro, rc), maturity_ladder(), valuation()
+    hs = history()
+    return lt, mh, val, ro, rc, oas, flags(lt, mh, ro, rc), maturity_ladder(), valuation(), hs, impact(hs), sim_inputs(lt, hs), transmission()

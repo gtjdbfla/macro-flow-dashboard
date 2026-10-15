@@ -333,6 +333,35 @@ def valuation_table(v):
             "<th class='r'>CAPEX ÷ 시총</th><th class='r'>52주 고점 대비</th><th class='r'>연 변동성</th></tr>" + "".join(rows) + "</table>")
 
 
+def trend_table(imp):
+    """안전성·금융비용 지표의 1년 전 대비 방향(개선/악화/보합). imp: ai_safety_impact."""
+    spec = [("이자보상배율", "cov", "cov_1y", True, "{:.1f}배"), ("유동성 런웨이", "runway", "runway_1y", True, "{:.1f}년"),
+            ("순부채 ÷ 영업현금흐름", "nd_ocf", "nd_ocf_1y", False, "{:.1f}배"), ("이자 ÷ 영업이익", "int_ebit", "int_ebit_1y", False, "{:.0%}"),
+            ("실효 금리(이자÷평균 부채)", "eff_rate", "eff_rate_1y", False, "{:.1%}")]
+    head = "".join(f"<th class='r'>{n}</th>" for n, *_ in spec)
+    rows = []
+    for r in imp.itertuples():
+        cells = []
+        for n, a, b, up_good, fmt in spec:
+            va, vb = getattr(r, a), getattr(r, b)
+            if va != va:
+                cells.append("<td class='r'>적자·해당 없음</td>")
+                continue
+            now = fmt.format(va)
+            if vb != vb or not np.isfinite(vb) or vb == 0:
+                cells.append(f"<td class='r'>{now}</td>")
+                continue
+            ch = va / vb - 1 if vb > 0 else 0.0
+            better = (ch > 0.1) if up_good else (ch < -0.1)
+            worse = (ch < -0.1) if up_good else (ch > 0.1)
+            if np.isinf(va):
+                better, worse = True, False
+            tag = "<span class='b good'>개선</span>" if better else ("<span class='b bad'>악화</span>" if worse else "<span class='b mid'>보합</span>")
+            cells.append(f"<td class='r'>{now} <span class='muted'>(1년 전 {fmt.format(vb)})</span> {tag}</td>")
+        rows.append(f"<tr><td><b>{r.name}</b></td>{''.join(cells)}</tr>")
+    return f"<table class='mini'><tr><th>회사</th>{head}</tr>{''.join(rows)}</table>"
+
+
 def freshness(meta: dict):
     items = [("미국 마감", meta["us_close"]), ("한국 수급", meta["kis_last"]), ("SEC 최신 공시", meta["sec_filed"]),
              ("재무 기준 분기", meta["sec_period"]), ("대만 월매출", meta["twse_month"][:7])]

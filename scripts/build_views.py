@@ -91,9 +91,11 @@ ev = {"regime_testable": int(len(t)), "regime_train_sig": int(t.train_sig.sum())
       "ledger": summary.get("ledger", {}), "score_components": int(len(pd.read_parquet(R / "score_validation.parquet"))),
       "score_included": int(pd.read_parquet(R / "score_validation.parquet").included.sum())}
 for _n in ("evidence_tests", "evidence_conditions", "korea_model_v2", "ai_forecast", "ai_forecast_eval", "ai_forecast_negatives",
-           "ai_safety_latest", "ai_merton_history", "ai_merton_vs_issued", "ai_roic_big4", "ai_roic_company", "ai_credit_oas", "ai_debt_maturity", "ai_valuation"):
+           "ai_safety_latest", "ai_merton_history", "ai_merton_vs_issued", "ai_roic_big4", "ai_roic_company", "ai_credit_oas", "ai_debt_maturity", "ai_valuation", "ai_safety_history", "ai_safety_impact", "ai_fin_inputs", "ai_transmission"):
     if (R / f"{_n}.parquet").exists():
         pd.read_parquet(R / f"{_n}.parquet").to_parquet(V / f"{_n}.parquet")
+if (R / "ai_transmission.json").exists():
+    (V / "ai_transmission.json").write_text((R / "ai_transmission.json").read_text(encoding="utf-8"), encoding="utf-8")
 if (R / "evidence_now.json").exists():
     (V / "evidence_now.json").write_text((R / "evidence_now.json").read_text(encoding="utf-8"), encoding="utf-8")
 (V / "evidence.json").write_text(json.dumps(ev, ensure_ascii=False, default=float), encoding="utf-8")

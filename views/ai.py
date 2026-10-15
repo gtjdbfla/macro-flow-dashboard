@@ -64,8 +64,11 @@ ui.howto(
         "**한계**: 4분기 창이 겹쳐 독립 표본이 약 9개이고, 방법을 5개 중 최선으로 골랐습니다. CAPEX는 2023년 이후 실제가 전망보다 약 15% 컸고(위쪽 위험), "
         "FCF 전망은 최근 실제보다 높게 나오는 경향이 있습니다. 추세가 꺾이는 시점(투자 철회, 금리 충격)은 못 잡습니다.\n\n"
         "**2. 시나리오 슬라이더**: 사용자가 CAPEX·영업현금흐름 증가율을 직접 넣으면 12개월 뒤 FCF와 CAPEX/영업현금흐름을 단순 곱셈으로 보여줍니다(감가상각·투자 시점 지연 미반영). 예측이 아니라 \"이 가정이면 이렇다\"입니다.\n\n"
-        "**3. 안전성은 예측이 아니라 상태 판정**: 런웨이·이자보상배율·ROIC 등은 \"지금 이 기업이 얼마나 버틸 수 있나\"를 숫자로 보여주고, 경고 기준(런웨이 1년, 이자보상 1.5배 등)은 사전에 고정했습니다. 과거에 이 지표가 부도·급락을 미리 알렸는지는 사건이 너무 적어 검증하지 못했으므로, **이 지표들의 등급은 전부 \"현황\"**이며 전향 장부(신호 이력)에 기록해 앞으로 확인합니다. 주가 기반 신용 추정(Merton)은 실제 발행 조건과 비교해 수준이 맞지 않아 참고 등급입니다.\n\n"
-        "**4. 선행 지표 체크리스트**: 대만 공급망 월매출, 분기 공시(10월 말), 신규 채권 가산금리를 다음에 확인할 항목으로 둡니다. 예측력이 확인된 지표는 아닙니다.\n\n"
+        "**3. 자금 조달 경로 시나리오(Oracle·CoreWeave)**: 현재 속도(FCF 적자)와 상환 일정이 5년 이어지면 신규 조달·부채·이자보상이 어떻게 되는지 산식으로 보여줍니다. 가정은 슬라이더로 바꾸며 예측이 아닙니다. 차입 의존 기업의 스트레스가 이후 반도체·NVIDIA 수익을 **앞서가는지**도 검정했지만 선행 관계는 없었고(같은 날 동행만 있음) 참고 등급입니다.
+
+"
+        "**4. 안전성은 예측이 아니라 상태 판정**: 런웨이·이자보상배율·ROIC 등은 \"지금 이 기업이 얼마나 버틸 수 있나\"를 숫자로 보여주고, 경고 기준(런웨이 1년, 이자보상 1.5배 등)은 사전에 고정했습니다. 과거에 이 지표가 부도·급락을 미리 알렸는지는 사건이 너무 적어 검증하지 못했으므로, **이 지표들의 등급은 전부 \"현황\"**이며 전향 장부(신호 이력)에 기록해 앞으로 확인합니다. 주가 기반 신용 추정(Merton)은 실제 발행 조건과 비교해 수준이 맞지 않아 참고 등급입니다.\n\n"
+        "**5. 선행 지표 체크리스트**: 대만 공급망 월매출, 분기 공시(10월 말), 신규 채권 가산금리를 다음에 확인할 항목으로 둡니다. 예측력이 확인된 지표는 아닙니다.\n\n"
         "**검증해 보고 탈락한 방법(" + badge("참고", "mid") + ")**: 수주잔고 격차(순위 상관 +0.03), NVIDIA 매출이 CAPEX를 앞선다(표본외 개선 불일치), "
         "증가율 평균회귀(1분기 앞에서 \"지속\"보다 나쁨), CAPEX 기반 감가상각 계산. **주가 예측**도 이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못해 하지 않습니다."
     ),
@@ -189,6 +192,50 @@ if slt is not None:
             plot(fig, 300)
         st.markdown('<p class="note">Oracle은 BBB급, CoreWeave는 HY(BB~B)급에 가까운 조달 환경입니다. 지금 가장 도드라진 곳은 CCC 스프레드가 3년 내 최고라는 점이고, '
                     'BBB는 중간 수준입니다(저신용 쪽만 긴장).</p>', unsafe_allow_html=True)
+
+    shs = load("views/ai_safety_history.parquet")
+    simp = load("views/ai_safety_impact.parquet")
+    if shs is not None and simp is not None and len(simp):
+        st.markdown("#### 추세 — 좋아지고 있나, 나빠지고 있나 (1년 전 대비)")
+        st.markdown(ui.trend_table(simp), unsafe_allow_html=True)
+        k1, k2, k3 = st.columns(3, gap="large")
+        colr = {"BIG4": "#5b8def", "ORCL": "#e08a1e", "CRWV": "#ee5555"}
+        nmr = {"BIG4": "Big4 합계", "ORCL": "Oracle", "CRWV": "CoreWeave"}
+        with k1:
+            st.markdown("**순부채(리스 포함) ÷ 영업현금흐름** (배)")
+            fig = go.Figure()
+            for tk in ("BIG4", "ORCL", "CRWV"):
+                g = shs[(shs.ticker == tk)].dropna(subset=["nd_ocf"])
+                fig.add_scatter(x=g.pe, y=g.nd_ocf.clip(upper=25), name=nmr[tk], mode="lines+markers", line=dict(color=colr[tk]))
+            plot(fig, 270)
+        with k2:
+            st.markdown("**이자비용 ÷ 영업이익** (%, 이익이 이자로 나가는 몫)")
+            fig = go.Figure()
+            for tk in ("BIG4", "ORCL"):
+                g = shs[(shs.ticker == tk)].dropna(subset=["int_ebit"])
+                fig.add_scatter(x=g.pe, y=g.int_ebit * 100, name=nmr[tk], mode="lines+markers", line=dict(color=colr[tk]))
+            plot(fig, 270)
+            st.markdown('<p class="note">CoreWeave는 영업적자라 비율을 낼 수 없습니다(이자가 이익을 전부 넘음).</p>', unsafe_allow_html=True)
+        with k3:
+            st.markdown("**유동성 런웨이** (년, 로그 눈금)")
+            fig = go.Figure()
+            for tk in ("BIG4", "ORCL", "CRWV"):
+                g = shs[(shs.ticker == tk)].replace([np.inf], np.nan).dropna(subset=["runway"])
+                fig.add_scatter(x=g.pe, y=g.runway, name=nmr[tk], mode="lines+markers", line=dict(color=colr[tk]))
+            fig.update_yaxes(type="log")
+            plot(fig, 270)
+        ib, io, ic = (simp.set_index("ticker").loc[t] for t in ("BIG4", "ORCL", "CRWV"))
+        st.markdown("#### 이 금융 조건이 AI 수익성에 주는 영향")
+        st.markdown(
+            f"- **빅테크 4사 (영향 작음)**: 빚이 2년 만에 크게 늘어 순현금에서 순부채로 넘어갔고 이자도 +{ib.interest_yoy*100:.0f}% 늘었지만, 이자는 영업이익의 {ib.int_ebit*100:.1f}%에 불과합니다. "
+            f"이익을 깎는 것보다 **투자 여력(FCF)과 재무 유연성이 줄어드는 쪽**의 영향이 큽니다. 지난 1년 CAPEX 중 외부 자금(순부채 증가)으로 댄 몫은 {ib.debt_funded*100:.0f}%로, 대부분 영업현금과 보유 현금으로 충당했습니다.\n"
+            f"- **Oracle (이익의 약 {io.int_ebit*100:.0f}%가 이자)**: 이자비용이 +{io.interest_yoy*100:.0f}% 늘었고(영업이익은 +{io.ebit_yoy*100:.0f}%), 이자보상은 {io.cov_1y:.1f}배 → {io['cov']:.1f}배로 보합입니다. 영업이익이 같이 늘어 버티고 있지만, "
+            f"지난 1년 CAPEX의 {io.debt_funded*100:.0f}%를 빚·리스로 조달했습니다. 현금 런웨이는 {io.runway:.1f}년으로 신규 조달에 계속 의존합니다.\n"
+            f"- **CoreWeave (이자가 이익을 모두 삼킴)**: 영업이익이 적자라 이자보상배율이 마이너스입니다. 이자는 +{ic.interest_yoy*100:.0f}% 늘었고(자산화된 이자 제외 보고치), 부채가 빠르게 늘어 순부채÷영업현금흐름은 개선됐지만({ic.nd_ocf_1y:.0f}배 → {ic.nd_ocf:.1f}배) 이는 영업현금흐름이 커진 덕입니다. "
+            f"런웨이 {ic.runway:.2f}년으로 조달 시장이 닫히면 가장 먼저 영향을 받습니다.\n"
+            "- **전달 경로**: 조달 금리 상승 → 이자비용 증가 → 영업이익 대비 이자 부담 상승 → 투자 속도 조절 압력. 빅테크는 이 경로가 약하고, 차입 의존 기업은 강합니다.")
+        st.markdown('<p class="note">이자·부채는 SEC 공시 값이며, CoreWeave는 이자 일부를 자산으로 처리해(자본화) 보고 이자가 실제 금리보다 낮게 나옵니다.</p>', unsafe_allow_html=True)
+
     smat = load("views/ai_debt_maturity.parquet")
     sval = load("views/ai_valuation.parquet")
     h1, h2 = st.columns(2, gap="large")
@@ -259,6 +306,58 @@ if fp is not None:
 
 st.markdown('<p class="note">이 지표들은 주가를 예측한 적이 없습니다(이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못함). '
             '대신 가정을 직접 넣어 결과를 보는 산식 시나리오와, 다음에 확인될 선행 지표를 제공합니다.</p>', unsafe_allow_html=True)
+
+fin_in = load("views/ai_fin_inputs.parquet")
+trans = load("views/ai_transmission.parquet")
+if fin_in is not None and len(fin_in):
+    @st.fragment
+    def fin_sim():
+        from src.ai import safety as SF
+        st.markdown(badge("산식 시나리오", "info") + "**자금 조달 경로 — 지금 속도가 5년 이어지면 (Oracle·CoreWeave)**", unsafe_allow_html=True)
+        pick = st.segmented_control("회사", ["Oracle", "CoreWeave"], default="Oracle", key="fin_pick", label_visibility="collapsed")
+        row = fin_in[fin_in.name == (pick or "Oracle")].iloc[0].to_dict()
+        hs_ = shs[shs.ticker == row["ticker"]].sort_values("pe")
+        e_chg = float(hs_.ebit.iloc[-1] - hs_.ebit.iloc[-5]) / 1e8 if len(hs_) >= 5 else 0.0
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            fcf_y = st.slider("연 FCF (억 달러) — 기본: 최근 분기×4", -800, 300, int(round(row["fcf_runrate"] / 1e8)), key=f"fs_f_{row['ticker']}")
+            imp_f = st.slider("FCF 연간 개선 (억 달러)", 0, 300, 0, key=f"fs_i_{row['ticker']}")
+        with c2:
+            nr = st.slider("신규 조달 금리 (%) — 기본: 최근 발행 쿠폰", 3.0, 14.0, round(row["new_rate"] * 100, 1), 0.1, key=f"fs_n_{row['ticker']}")
+            e_imp = st.slider("영업이익 연간 증가 (억 달러)", -50, 300, 0, key=f"fs_e_{row['ticker']}")
+        with c3:
+            mc = st.slider("유지할 최소 현금 (억 달러)", 0, 800, int(round(row["cash"] / 1e8)), key=f"fs_c_{row['ticker']}")
+            st.caption(f"참고: 최근 1년 영업이익 변화 {e_chg:+,.0f}억/년 · 기존 부채 금리 {row['old_rate']*100:.1f}%")
+        o = SF.simulate(row, fcf_y * 1e8, imp_f * 1e8, nr / 100, None, e_imp * 1e8, mc * 1e8)
+        fig = go.Figure()
+        fig.add_bar(x=[f"{k}년 뒤" for k in o.year], y=o.debt / 1e8, name="총부채", marker_color="#5b8def")
+        fig.add_bar(x=[f"{k}년 뒤" for k in o.year], y=o.borrow / 1e8, name="그해 신규 조달", marker_color="#ee5555")
+        fig.add_scatter(x=[f"{k}년 뒤" for k in o.year], y=o["cov"], name="이자보상배율(오른쪽)", mode="lines+markers", yaxis="y2", line=dict(color="#f59e0b", width=3))
+        fig.update_layout(barmode="group", yaxis2=dict(overlaying="y", side="right", title="배", showgrid=False))
+        a, b = st.columns([1.2, 1], gap="large")
+        with a:
+            plot(fig, 300)
+        with b:
+            tb = pd.DataFrame({"연차": [f"{k}년" for k in o.year], "FCF": (o.fcf / 1e8).round(0), "원금 만기": (o.maturity / 1e8).round(0), "신규 조달": (o.borrow / 1e8).round(0),
+                               "총부채": (o.debt / 1e8).round(0), "이자": (o.interest / 1e8).round(0), "이자보상": o["cov"].round(1)})
+            st.dataframe(tb, hide_index=True, width="stretch", height=230)
+        tot = o.borrow.sum() / 1e8
+        last = o.iloc[-1]
+        st.markdown(f"**{pick}**: 이 가정이면 5년간 **신규 조달 약 {tot:,.0f}억 달러**가 필요하고, 부채는 {row['debt']/1e8:,.0f}억 → {last.debt/1e8:,.0f}억, 이자는 {row['interest']/1e8:,.0f}억 → {last.interest/1e8:,.0f}억, "
+                    f"이자보상은 {'적자' if last['cov'] != last['cov'] or last['cov'] < 0 else f'{last['cov']:.1f}배'}가 됩니다 (억 달러, 영업이익 연 {e_imp:+,}억 가정).")
+        st.markdown('<p class="note">예측이 아니라 산식입니다. 기본값은 \"현재 속도 유지\"(영업이익 정체)라 보수적이며, 영업이익이 최근처럼 늘면(위 참고치를 슬라이더에 입력) 결과가 크게 달라집니다. '
+                    '미사용 신용한도·자산 매각·증자·고객 선급금은 반영하지 않았고, 조달 시장이 열려 있다는 전제입니다.</p>', unsafe_allow_html=True)
+    fin_sim()
+if trans is not None and len(trans):
+    with st.expander("차입 의존 기업·신용시장의 스트레스는 AI 공급망을 앞서가나 (검증 결과: 아니오)"):
+        cj = load("views/ai_transmission.json") or {}
+        tt = trans.copy()
+        st.dataframe(pd.DataFrame({"신호": tt.signal, "결과": tt.target, "표본": tt.n, "유효표본": tt.n_eff.round(0), "상관": tt["corr"].round(2), "t(겹침 보정)": tt.t.round(1),
+                                   "전반": tt.corr_h1.round(2), "후반": tt.corr_h2.round(2)}), hide_index=True, width="stretch")
+        st.markdown(f'<p class="note">어떤 조합도 |t|가 2에 못 미쳐 <b>선행 관계는 확인되지 않았습니다(참고)</b>. 반면 같은 날 움직임은 꽤 같이 갑니다'
+                    f'(2025-04~ 일별 상관: CoreWeave–NVIDIA {cj.get("CRWV-NVIDIA", float("nan")):.2f}, Oracle–NVIDIA {cj.get("ORCL-NVIDIA", float("nan")):.2f}). '
+                    '즉 신용 스트레스가 공급망 약세를 미리 알려 주기보다, 같은 \"AI 트레이드\" 안에서 함께 움직입니다. CoreWeave 표본은 유효 14개뿐입니다.</p>', unsafe_allow_html=True)
+
 e1, e2 = st.columns(2, gap="large")
 with e1:
     @st.fragment
