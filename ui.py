@@ -272,6 +272,16 @@ def forecast_table(fp):
             "<th class='r'>범위(과거 오차 ±1배)</th><th class='r'>최근 편향(2023~)</th></tr>" + "".join(rows) + "</table>")
 
 
+def howto(info_md: str, pred_md: str, title: str = "이 탭으로 알 수 있는 것 · 미래를 어떻게 예측하나", expanded: bool = True):
+    """탭 상단 설명: 왼쪽 '알 수 있는 정보(데이터·한계)', 오른쪽 '미래 예측 방식(방법·정확도·한계)'. 마크다운 + 배지 HTML."""
+    with st.expander(title, expanded=expanded):
+        a, b = st.columns(2, gap="large")
+        with a:
+            st.markdown("#### 알 수 있는 정보\n" + info_md, unsafe_allow_html=True)
+        with b:
+            st.markdown("#### 미래를 예측하는 방식\n" + pred_md, unsafe_allow_html=True)
+
+
 def freshness(meta: dict):
     items = [("미국 마감", meta["us_close"]), ("한국 수급", meta["kis_last"]), ("SEC 최신 공시", meta["sec_filed"]),
              ("재무 기준 분기", meta["sec_period"]), ("대만 월매출", meta["twse_month"][:7])]
