@@ -341,8 +341,10 @@ if fin_in is not None and len(fin_in):
             st.dataframe(tb, hide_index=True, width="stretch", height=230)
         tot = o.borrow.sum() / 1e8
         last = o.iloc[-1]
+        lc = float(last["cov"])
+        cov_txt = "적자" if (lc != lc or lc < 0) else "%.1f배" % lc
         st.markdown(f"**{pick}**: 이 가정이면 5년간 **신규 조달 약 {tot:,.0f}억 달러**가 필요하고, 부채는 {row['debt']/1e8:,.0f}억 → {last.debt/1e8:,.0f}억, 이자는 {row['interest']/1e8:,.0f}억 → {last.interest/1e8:,.0f}억, "
-                    f"이자보상은 {'적자' if last['cov'] != last['cov'] or last['cov'] < 0 else f'{last['cov']:.1f}배'}가 됩니다 (억 달러, 영업이익 연 {e_imp:+,}억 가정).")
+                    f"이자보상은 {cov_txt}가 됩니다 (영업이익 연 {e_imp:+,}억 달러 가정).")
         st.markdown('<p class="note">예측이 아니라 산식입니다. 기본값은 \"현재 속도 유지\"(영업이익 정체)라 보수적이며, 영업이익이 최근처럼 늘면(위 참고치를 슬라이더에 입력) 결과가 크게 달라집니다. '
                     '미사용 신용한도·자산 매각·증자·고객 선급금은 반영하지 않았고, 조달 시장이 열려 있다는 전제입니다.</p>', unsafe_allow_html=True)
     fin_sim()
