@@ -51,9 +51,10 @@ ui.howto(
         "**현재 — 지금 상태는 어떤가 (4단계 체인)**\n"
         "- ① 투자: 12개월 CAPEX와 증가율 · ② 수요: 클라우드 매출·마진, **수주잔고(RPO)**, NVIDIA 매출, 대만 AI 공급망 월매출 · "
         "③ 이익·현금: 영업이익·FCF, CAPEX 1달러당 이익 증가 · ④ 조달: CAPEX/영업현금흐름, 빅테크 신규 채권 **가산금리**, CoreWeave 쿠폰.\n"
-        "- 위 지표를 **사전에 고정한 규칙의 신호 10개**(경고·주의·긍정·강함)로 판정합니다. 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.\n\n"
+        "- 위 지표를 **사전에 고정한 규칙의 신호 14개**(경고·주의·긍정·강함)로 판정합니다. 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.\n"
+        "- **안전성(빚 감당 능력)**: 순부채, 이자보상배율, 12개월 유동성 런웨이, 원금 상환 일정, 계약잔고(RPO) ÷ 부채, 증분 ROIC, 주가 기반 신용 스트레스(Merton), 신용등급대별 시장 스프레드, 밸류에이션.\n\n"
         "**알 수 없는 것**: 재무는 **회사 전체 기준**이라 AI만의 수치가 아니고(신뢰 등급 C), CAPEX의 **구성**(서버·건물·칩)은 공시에 없습니다. "
-        "CDS·유통시장 채권 수익률, HBM 가격도 무료 데이터가 없습니다.\n\n"
+        "**CDS 시세와 유통시장 채권 수익률은 무료 데이터가 없어** 위 안전성 지표들로 대신합니다. HBM 가격도 없습니다.\n\n"
         "<span class='muted'>갱신: 분기 실적 시즌(1·4·7·10월 말)에 새 공시를 확인하면 자동 재계산, 대만 월매출은 매월 10일경, 채권은 발행 시.</span>"
     ),
     pred_md=(
@@ -63,7 +64,8 @@ ui.howto(
         "**한계**: 4분기 창이 겹쳐 독립 표본이 약 9개이고, 방법을 5개 중 최선으로 골랐습니다. CAPEX는 2023년 이후 실제가 전망보다 약 15% 컸고(위쪽 위험), "
         "FCF 전망은 최근 실제보다 높게 나오는 경향이 있습니다. 추세가 꺾이는 시점(투자 철회, 금리 충격)은 못 잡습니다.\n\n"
         "**2. 시나리오 슬라이더**: 사용자가 CAPEX·영업현금흐름 증가율을 직접 넣으면 12개월 뒤 FCF와 CAPEX/영업현금흐름을 단순 곱셈으로 보여줍니다(감가상각·투자 시점 지연 미반영). 예측이 아니라 \"이 가정이면 이렇다\"입니다.\n\n"
-        "**3. 선행 지표 체크리스트**: 대만 공급망 월매출, 분기 공시(10월 말), 신규 채권 가산금리를 다음에 확인할 항목으로 둡니다. 예측력이 확인된 지표는 아닙니다.\n\n"
+        "**3. 안전성은 예측이 아니라 상태 판정**: 런웨이·이자보상배율·ROIC 등은 \"지금 이 기업이 얼마나 버틸 수 있나\"를 숫자로 보여주고, 경고 기준(런웨이 1년, 이자보상 1.5배 등)은 사전에 고정했습니다. 과거에 이 지표가 부도·급락을 미리 알렸는지는 사건이 너무 적어 검증하지 못했으므로, **이 지표들의 등급은 전부 \"현황\"**이며 전향 장부(신호 이력)에 기록해 앞으로 확인합니다. 주가 기반 신용 추정(Merton)은 실제 발행 조건과 비교해 수준이 맞지 않아 참고 등급입니다.\n\n"
+        "**4. 선행 지표 체크리스트**: 대만 공급망 월매출, 분기 공시(10월 말), 신규 채권 가산금리를 다음에 확인할 항목으로 둡니다. 예측력이 확인된 지표는 아닙니다.\n\n"
         "**검증해 보고 탈락한 방법(" + badge("참고", "mid") + ")**: 수주잔고 격차(순위 상관 +0.03), NVIDIA 매출이 CAPEX를 앞선다(표본외 개선 불일치), "
         "증가율 평균회귀(1분기 앞에서 \"지속\"보다 나쁨), CAPEX 기반 감가상각 계산. **주가 예측**도 이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못해 하지 않습니다."
     ),
@@ -92,9 +94,9 @@ steps = [
      f"Big4 12개월 CAPEX <b>{B.capex_ttm/1e8:,.0f}억 달러</b><br>전년 대비 <b>{pct(B.capex_yoy*100)}</b>"),
     ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8"]),
      f"클라우드 3사 매출 <b>{pct(cl.yoy*100)}</b> · 마진 {cl.margin*100:.0f}%<br>대만 핵심 8사 중 <b>{n_tw}사</b> 월매출 +20%↑"),
-    ("3 이익·현금", "회수와 현금흐름", kind_of(["F1", "F2"]),
+    ("3 이익·현금", "회수와 현금흐름", kind_of(["F1", "F2", "F14"]),
      f"매출 {pct(B.rev_yoy*100)} · 영업이익 {pct(B.opinc_yoy*100)}<br>FCF 전년 대비 <b>{B.fcf_chg/1e8:+,.0f}억 달러</b>"),
-    ("4 조달", "자금 조달", kind_of(["F3", "F9", "F10"]),
+    ("4 조달", "자금 조달", kind_of(["F3", "F9", "F10", "F11", "F12"]),
      f"오라클 CAPEX/영업현금흐름 <b>{LT.loc['ORCL','capex_ocf']:.2f}</b> · 코어위브 <b>{LT.loc['CRWV','capex_ocf']:.1f}</b><br>알파벳 10년 신규발행 가산금리 {g10_txt}"),
 ]
 lab = {"good": "양호", "warn": "주의", "bad": "경고", "mid": "중립"}
@@ -150,6 +152,76 @@ with d:
     crwv = issu[issu.ticker == "CRWV"].sort_values("filed")
     if len(crwv):
         st.markdown('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>", unsafe_allow_html=True)
+
+
+# ── 안전성(신용) ───────────────────────────────────────────────────────────
+slt = load("views/ai_safety_latest.parquet")
+if slt is not None:
+    srcc = load("views/ai_roic_company.parquet")
+    sm = load("views/ai_merton_history.parquet")
+    sv = load("views/ai_merton_vs_issued.parquet")
+    soas = load("views/ai_credit_oas.parquet")
+    st.markdown("#### 안전성 — 빚을 감당할 수 있나 (CDS를 대신하는 신용 지표)")
+    st.markdown(ui.safety_table(slt, srcc), unsafe_allow_html=True)
+    st.markdown('<p class="note">억 달러. <b>CDS 시세는 무료 데이터가 없어</b> 공시(부채·리스·현금·이자)와 가격으로 대신 계산합니다. '
+                '<b>유동성 런웨이</b> = 현금 ÷ (FCF 적자 + 12개월 내 원금 만기): 신규 조달 없이 버틸 수 있는 기간(미사용 한도·계약 자금 미반영). '
+                '<b>RPO ÷ 부채</b>: 계약 매출잔고가 부채+리스의 몇 배인가(고객 신용도는 반영 안 됨). '
+                '<b>증분 ROIC</b> = 2022년 대비 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX(낙관적 계산).</p>', unsafe_allow_html=True)
+    g1, g2 = st.columns(2, gap="large")
+    with g1:
+        st.markdown("**주가로 추정한 신용 스트레스** (Merton 5년 내재 스프레드, bp · CDS 아님)")
+        if sm is not None:
+            fig = go.Figure()
+            for tk, nm in (("ORCL", "Oracle"), ("CRWV", "CoreWeave")):
+                g = sm[sm.ticker == tk].dropna(subset=["spread_bp"]).sort_values("date")
+                fig.add_scatter(x=g.date, y=g.spread_bp, name=nm, mode="lines+markers")
+            fig.update_yaxes(type="log", title="bp (로그)")
+            plot(fig, 300)
+        st.markdown('<p class="note">주식가치·변동성·부채·리스로 계산한 모형값입니다. 실제 신규 발행과 비교하면 수준이 맞지 않아(Oracle은 낮게, CoreWeave는 2배 이상 높게) '
+                    '<b>수준이 아니라 방향만 참고</b>하세요. 빅테크 4사는 거의 0이라 그리지 않았습니다.</p>', unsafe_allow_html=True)
+    with g2:
+        st.markdown("**신용등급대별 시장 스프레드** (ICE BofA OAS, bp · 최근 3년 범위)")
+        if soas is not None and len(soas):
+            fig = go.Figure()
+            fig.add_bar(x=soas.bucket, y=soas.max3y - soas.min3y, base=soas.min3y, name="3년 범위", marker_color="rgba(100,116,139,0.35)")
+            fig.add_scatter(x=soas.bucket, y=soas.now, mode="markers+text", name="지금", marker=dict(size=13, color="#f59e0b"),
+                            text=[f"{v:,.0f} ({p:.0f}백분위)" for v, p in zip(soas.now, soas.pct)], textposition="middle right")
+            plot(fig, 300)
+        st.markdown('<p class="note">Oracle은 BBB급, CoreWeave는 HY(BB~B)급에 가까운 조달 환경입니다. 지금 가장 도드라진 곳은 CCC 스프레드가 3년 내 최고라는 점이고, '
+                    'BBB는 중간 수준입니다(저신용 쪽만 긴장).</p>', unsafe_allow_html=True)
+    smat = load("views/ai_debt_maturity.parquet")
+    sval = load("views/ai_valuation.parquet")
+    h1, h2 = st.columns(2, gap="large")
+    with h1:
+        st.markdown("**상환 일정 — 언제 얼마를 갚아야 하나** (공시된 원금 만기, 억 달러)")
+        if smat is not None and len(smat):
+            fig = go.Figure()
+            cols = {"1년 이내": "#ee5555", "2년차": "#e08a1e", "3년차": "#e0b41e", "4년차": "#8bc34a", "5년차": "#5b8def", "5년 초과": "#64748b"}
+            for tk, nm in (("ORCL", "Oracle"), ("CRWV", "CoreWeave")):
+                g = smat[smat.ticker == tk]
+                for bk, col in cols.items():
+                    v = g[g.bucket == bk].amount
+                    fig.add_bar(name=bk, x=[nm], y=[float(v.iloc[0]) / 1e8 if len(v) else 0.0], marker_color=col, showlegend=(tk == "ORCL"), legendgroup=bk)
+            fig.update_layout(barmode="stack")
+            plot(fig, 320)
+            _o = smat[(smat.ticker == "ORCL") & (smat.bucket != "5년 초과")].amount.sum() / 1e8
+            st.markdown(f'<p class="note">Oracle은 앞으로 5년 안에 약 {_o:,.0f}억 달러, 그 뒤 {smat[(smat.ticker=="ORCL")&(smat.bucket=="5년 초과")].amount.iloc[0]/1e8:,.0f}억 달러가 만기입니다. '
+                        '대부분 차환(새 빚으로 갚기)이 전제라, 시장이 닫히면 이 사다리가 부담이 됩니다. 기준일은 각 회사의 최신 10-K입니다.</p>', unsafe_allow_html=True)
+    with h2:
+        st.markdown("**시장은 이 회사들을 어떻게 값매기나** (밸류에이션·시장 스트레스)")
+        if sval is not None and len(sval):
+            st.markdown(ui.valuation_table(sval), unsafe_allow_html=True)
+            st.markdown('<p class="note">시총 = 최근 종가 × 최근 희석 주식수. FCF 수익률이 마이너스면 잉여현금흐름이 적자라는 뜻입니다. '
+                        '<b>CAPEX ÷ 시총</b>이 클수록 시총에 비해 투자 규모가 크다는 뜻으로, Oracle·CoreWeave에서 두드러집니다. '
+                        '주가가 52주 고점에서 크게 내려온 것(Oracle ' + f"{sval[sval.ticker=='ORCL'].dd52.iloc[0]*100:.0f}%, CoreWeave {sval[sval.ticker=='CRWV'].dd52.iloc[0]*100:.0f}%" + ')은 시장이 이 투자·차입 구조에 이미 의문을 반영했다는 신호입니다.</p>', unsafe_allow_html=True)
+    if sv is not None and len(sv):
+        with st.expander("주가 기반 추정은 실제 발행 조건과 얼마나 맞나 (검증)"):
+            vv = sv.copy()
+            vv["비율(추정÷실제)"] = vv.merton_bp / vv.issued_bp
+            st.dataframe(pd.DataFrame({"회사": vv.ticker, "발행일": pd.to_datetime(vv.date).dt.strftime("%Y-%m-%d"), "실제 발행 스프레드 bp(CoreWeave는 쿠폰−UST 5Y)": vv.issued_bp.round(0),
+                                       "같은 시점 Merton bp": vv.merton_bp.round(0), "비율(추정÷실제)": vv["비율(추정÷실제)"].round(2)}), hide_index=True, width="stretch")
+            st.markdown('<p class="note">표본이 5건뿐이라 상관을 내지 못합니다. Oracle은 실제보다 훨씬 낮게(과거 부채가 적게 반영된 시점), CoreWeave는 약 2.3배 높게 나왔습니다. '
+                        '그래서 이 지표는 <b>참고</b> 등급이며, 같은 회사의 추세 변화만 봅니다.</p>', unsafe_allow_html=True)
 
 # ── 다음 ────────────────────────────────────────────────────────────────────
 ui.stage("다음", "앞으로 — 다음 12개월 기준선 전망과 두 가지 도구")

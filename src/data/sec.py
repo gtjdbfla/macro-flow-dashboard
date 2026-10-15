@@ -25,19 +25,35 @@ FLOW_TAGS = {
     "da": ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
            "DepreciationAndAmortization", "Depreciation"],
     "buyback": ["PaymentsForRepurchaseOfCommonStock"],
+    "interest": ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt", "InterestExpenseDebtExcludingAmortization"],
 }
 INSTANT_TAGS = {
     "rpo": ["RevenueRemainingPerformanceObligation"],
     "lt_debt": ["LongTermDebtNoncurrent", "LongTermDebt"],
+    # 신용 안전성(2026-10-15): 회사마다 태그가 달라 우선순위 목록에서 해당 분기 값이 있는 첫 태그를 쓴다
+    "debt_nc": ["LongTermDebtNoncurrent", "LongTermNotesAndLoans", "LongTermNotesPayable", "LongTermDebt"],
+    "debt_c": ["DebtCurrent", "LongTermDebtCurrent", "NotesPayableCurrent", "ShortTermBorrowings"],
+    "debt_carry": ["DebtInstrumentCarryingAmount"],
+    "cash": ["CashAndCashEquivalentsAtCarryingValue"],
+    "st_inv": ["MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesDebtSecuritiesCurrent", "ShortTermInvestments"],
+    "cash_sti": ["CashCashEquivalentsAndShortTermInvestments", "CashCashEquivalentsAndMarketableSecurities"],
+    "op_lease": ["OperatingLeaseLiability"],
+    "fin_lease": ["FinanceLeaseLiability"],
+    "debt_due_12m": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths"],
+    "debt_y2": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo"],
+    "debt_y3": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree"],
+    "debt_y4": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour"],
+    "debt_y5": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive"],
+    "debt_after5": ["LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"],
 }
 
 
-def _facts(cf: dict, tag: str):
+def _facts(cf: dict, tag: str, unit: str = "USD"):
     f = cf["facts"].get("us-gaap", {}).get(tag)
-    if not f or "USD" not in f.get("units", {}):
+    if not f or unit not in f.get("units", {}):
         return []
     out = []
-    for x in f["units"]["USD"]:
+    for x in f["units"][unit]:
         if not str(x.get("form", "")).startswith("10-"):
             continue
         out.append({"start": pd.to_datetime(x["start"]) if x.get("start") else pd.NaT, "end": pd.to_datetime(x["end"]),
@@ -95,6 +111,12 @@ def fetch_company(ticker: str) -> pd.DataFrame:
                     got[x["end"]] = (x["val"], x["filed"], tag)
         rows += [{"ticker": ticker, "metric": metric, "end": e, "value": v, "filed": f, "tag": t}
                  for e, (v, f, t) in got.items()]
+    sh = _first_filed(_facts(cf, "WeightedAverageNumberOfDilutedSharesOutstanding", "shares"))
+    if not sh.empty:
+        sh = sh.dropna(subset=["start"])
+        sh = sh[((sh["end"] - sh["start"]).dt.days >= 80) & ((sh["end"] - sh["start"]).dt.days <= 100)]
+        rows += [{"ticker": ticker, "metric": "shares_dil", "end": r["end"], "value": r["val"], "filed": r["filed"],
+                  "tag": "WeightedAverageNumberOfDilutedSharesOutstanding"} for _, r in sh.iterrows()]
     return pd.DataFrame(rows)
 
 

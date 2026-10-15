@@ -6,6 +6,7 @@
 import json
 import re
 
+import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -280,6 +281,56 @@ def howto(info_md: str, pred_md: str, title: str = "이 탭으로 알 수 있는
             st.markdown("#### 알 수 있는 정보\n" + info_md, unsafe_allow_html=True)
         with b:
             st.markdown("#### 미래를 예측하는 방식\n" + pred_md, unsafe_allow_html=True)
+
+
+def safety_table(lt, rc):
+    """회사별 신용 안전성 표(HTML). 차입 의존 기업(Oracle·CoreWeave)을 맨 위에 둔다."""
+    order = ["ORCL", "CRWV", "AMZN", "MSFT", "META", "GOOGL", "NVDA"]
+    r_ = rc.set_index("ticker") if rc is not None else None
+    k = lambda kind, v: f"<span class='b {kind}'>{v}</span>" if kind else v  # noqa: E731
+    rows = []
+    for t in order:
+        x = lt[lt.ticker == t]
+        if x.empty:
+            continue
+        x = x.iloc[0]
+
+        def run_cell(v):
+            if not np.isfinite(v):
+                return "제한 없음"
+            return k("bad" if v < 1 else ("warn" if v < 2 else ""), f"{v:.1f}년")
+        cov = "적자" if x.ebit_cov != x.ebit_cov or x.ebit_cov < 0 else f"{x.ebit_cov:.1f}배"
+        cov_kind = "bad" if (x.ebit_cov != x.ebit_cov or x.ebit_cov < 1.5) else ("warn" if x.ebit_cov < 4 else "")
+        roic = ""
+        if r_ is not None and t in r_.index and np.isfinite(r_.loc[t, "roic"]):
+            rv = r_.loc[t, "roic"]
+            roic = k("bad" if rv < 0.05 else ("warn" if rv < 0.10 else ""), f"{rv*100:.0f}%")
+        nd = f"{x.net_debt_ocf:.1f}배" if x.net_debt_ocf == x.net_debt_ocf else "—"
+        rd = f"{x.rpo_debt:.1f}배" if x.rpo_debt == x.rpo_debt else "—"
+        rows.append(f"<tr><td><b>{x['name']}</b></td><td class='r'>{x.debt/1e8:,.0f} <span class='muted'>(+리스 {x.leases/1e8:,.0f})</span></td><td class='r'>{x.cash/1e8:,.0f}</td>"
+                    f"<td class='r'>{x.net_debt/1e8:,.0f}</td><td class='r'>{nd}</td><td class='r'>{k(cov_kind, cov)}</td><td class='r'>{x.due12/1e8:,.0f}</td>"
+                    f"<td class='r'>{x.fcf_ttm/1e8:,.0f}</td><td class='r'>{run_cell(x.runway_y)}</td><td class='r'>{run_cell(x.runway_rr_y)}</td>"
+                    f"<td class='r'>{rd}</td><td class='r'>{roic}</td></tr>")
+    return ("<table class='mini'><tr><th>회사</th><th class='r'>총부채 (+리스)</th><th class='r'>현금·단기투자</th><th class='r'>순부채(리스 포함)</th>"
+            "<th class='r'>순부채 ÷ 영업현금흐름</th><th class='r'>이자보상 (영업이익÷이자)</th><th class='r'>12개월 내 만기</th><th class='r'>FCF (12개월)</th>"
+            "<th class='r'>런웨이 (12개월 실적)</th><th class='r'>런웨이 (최근 분기 속도)</th><th class='r'>RPO ÷ 부채</th><th class='r'>증분 ROIC</th></tr>" + "".join(rows) + "</table>")
+
+
+def valuation_table(v):
+    """시장이 AI 수익을 얼마나 반영했나(밸류에이션·시장 스트레스)."""
+    order = ["ORCL", "CRWV", "AMZN", "MSFT", "META", "GOOGL", "NVDA"]
+    rows = []
+    for t in order:
+        x = v[v.ticker == t]
+        if x.empty:
+            continue
+        x = x.iloc[0]
+        dd = f"<span class='b {'bad' if x.dd52 < -0.4 else ('warn' if x.dd52 < -0.2 else 'mid')}'>{x.dd52*100:.0f}%</span>"
+        fy = f"<span class='b {'bad' if x.fcf_yield < -0.05 else ('warn' if x.fcf_yield < 0 else 'mid')}'>{x.fcf_yield*100:+.1f}%</span>"
+        rows.append(f"<tr><td><b>{x['name']}</b></td><td class='r'>{x.mcap/1e8:,.0f}</td><td class='r'>{x.ps:.1f}배</td><td class='r'>{fy}</td>"
+                    f"<td class='r'>{x.capex_mcap*100:.0f}%</td><td class='r'>{dd}</td><td class='r'>{x.vol*100:.0f}%</td></tr>")
+    return ("<table class='mini'><tr><th>회사</th><th class='r'>시가총액 (억 달러)</th><th class='r'>시총 ÷ 매출</th><th class='r'>FCF 수익률</th>"
+            "<th class='r'>CAPEX ÷ 시총</th><th class='r'>52주 고점 대비</th><th class='r'>연 변동성</th></tr>" + "".join(rows) + "</table>")
 
 
 def freshness(meta: dict):

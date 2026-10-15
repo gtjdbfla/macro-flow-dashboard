@@ -60,7 +60,7 @@ B = latest[latest.ticker == "BIG4"].iloc[0]
 cl = agg.iloc[-1]
 fl = {f["id"]: f for f in flags}
 demand = [i for i in ("F4", "F6", "F7", "F8") if i in fl]
-press = [i for i in ("F1", "F2", "F3", "F9", "F10") if i in fl]
+press = [i for i in ("F1", "F2", "F3", "F9", "F10", "F11", "F12", "F13", "F14") if i in fl]
 n_good = sum(level_kind(fl[i]["level"]) == "good" for i in demand)
 n_bad = sum(level_kind(fl[i]["level"]) in ("bad", "warn") for i in press)
 if n_good >= len(demand) / 2 and n_bad >= len(press) / 2:
@@ -73,7 +73,13 @@ else:
 # ── 요약 카드 한 쌍 ──────────────────────────────────────────────────────────
 head1 = (f"최근 20일 자금은 <b>{top['name']}</b>으로 가장 많이 들어오고, 금액으로는 <b>{bot_usd['name']}</b>, 비율로는 <b>{bot_pct['name']}</b>에서 가장 많이 빠졌습니다. "
          f"다음 한국 장 외국인은 <b>{zdir}</b>으로 보입니다.")
-head2 = f"{verdict} 수요 신호 {n_good}/{len(demand)}개 긍정, 회수·조달 신호 {n_bad}/{len(press)}개 경고·주의."
+slt_ = load("views/ai_safety_latest.parquet")
+extra = ""
+if slt_ is not None:
+    _b = slt_.set_index("ticker")
+    extra = (f" 빚 쪽은 <b>Oracle 런웨이 {_b.loc['ORCL','runway_y']:.1f}년, CoreWeave {_b.loc['CRWV','runway_y']:.1f}년</b>"
+             f"(현금 ÷ FCF 적자·12개월 만기)이라 신규 조달이 필요한 구조입니다.")
+head2 = f"{verdict}{extra} 수요 신호 {n_good}/{len(demand)}개 긍정, 회수·조달 신호 {n_bad}/{len(press)}개 경고·주의."
 c1 = summary_card("① 월가의 자금은 어디에 있나", badge("한국 전달만 검증됨", "info") + badge("섹터 이동은 약한 단서", "warn"), head1,
                   [("순유입 1위 (20일)", top["name"], f"순자산의 {top.flow_1m*100:+.1f}% · {top.flow_20d_usd/1e8:+,.0f}억 달러"),
                    ("가장 많이 빠진 곳", bot_usd["name"], f"{bot_usd.flow_20d_usd/1e8:+,.0f}억 달러 · 순자산의 {bot_usd.flow_1m*100:+.1f}%"),

@@ -35,6 +35,8 @@ FRED_DAILY = {
     "DTWEXBGS": "Broad USD", "DCOILWTICO": "WTI", "NFCI": "Chicago FCI (weekly)",
     "WALCL": "Fed balance sheet (weekly)", "WTREGEN": "TGA (weekly)", "RRPONTSYD": "ON RRP",
 }
+# 신용등급대별 옵션조정스프레드(ICE BofA). FRED는 최근 3년만 제공. AI 차입자(Oracle=BBB급, CoreWeave=B~BB급)의 시장 금융환경을 본다.
+FRED_CREDIT = {"DGS5": "UST 5Y", "BAMLC0A4CBBB": "BBB OAS", "BAMLH0A1HYBB": "BB OAS", "BAMLH0A2HYB": "B OAS", "BAMLH0A3HYC": "CCC OAS"}
 FRED_VINTAGE = {
     "CPIAUCSL": "CPI", "CPILFESL": "Core CPI", "PCEPI": "PCE", "PCEPILFE": "Core PCE",
     "UNRATE": "Unemployment", "PAYEMS": "Nonfarm Payroll", "GDPC1": "Real GDP",

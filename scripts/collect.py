@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data import DATA_DIR, cftc, cloud, debt, fred, french, sec, ssga, twse, yahoo  # noqa: E402
-from src.data.universe import CFTC, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
+from src.data.universe import CFTC, FRED_CREDIT, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
 cov_path = DATA_DIR / "coverage.json"
@@ -22,7 +22,7 @@ if not only or "cftc" in only:
         cov["cftc"] = {"updated": now, "error": str(e)[:200], "series": {}}
 if not only or "fred" in only:
     try:
-        cov["fred"] = {"updated": now, "series": fred.collect(FRED_DAILY, FRED_VINTAGE)}
+        cov["fred"] = {"updated": now, "series": fred.collect({**FRED_DAILY, **FRED_CREDIT}, FRED_VINTAGE)}
     except Exception as e:
         cov["fred"] = {"updated": now, "error": str(e)[:200], "series": {}}
 
