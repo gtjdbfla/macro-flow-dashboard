@@ -2,7 +2,6 @@ services:
   macro-flow-dashboard:
     build: .
     container_name: macro-flow-dashboard
-    # 앱은 LAN 8503, Caddy가 8087. 8501(hynix) 8502(fermi)와 겹치지 않게 한다.
     ports:
       - "8503:8503"
     restart: unless-stopped
@@ -12,11 +11,11 @@ services:
       - .env
     environment:
       - MACRO_DATA_DIR=/app/data
-      # stock_dashboard와 같은 KIS 앱키 — 토큰 캐시를 읽기전용으로 공유(재발급 알림톡 방지).
       - KIS_TOKEN_FILE=/shared/kis_token.json
     volumes:
       - ./data:/app/data
       - /home/yulimseo/stock_dashboard/data/kis_token.json:/shared/kis_token.json:ro
+    command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8503", "--server.baseUrlPath=macro"]
 
   caddy:
     image: caddy:2-alpine
@@ -28,6 +27,7 @@ services:
       - "0.0.0.0:8087:8087"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./home:/srv-home:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
