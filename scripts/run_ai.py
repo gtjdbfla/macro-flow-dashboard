@@ -11,6 +11,7 @@ from src.ai import cloud as C  # noqa: E402
 from src.ai import forecast as FC  # noqa: E402
 from src.ai import safety as SF  # noqa: E402
 from src.ai import credit as CR  # noqa: E402
+from src.ai import gpu as GP  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
 from src.data.yahoo import _fname  # noqa: E402
@@ -67,7 +68,15 @@ try:
 except Exception as e:  # 안전성 지표 실패가 나머지 AI 계산을 막지 않게 한다
     print("safety 실패:", e)
     s_fl = []
-fl = sorted(fl + C.flags(ch, tw) + cr_fl + s_fl, key=lambda f: int(f["id"][1:]))
+gpu_fl = []
+if (PARQUET / "gpu_rental.parquet").exists():
+    gp = GP.series()
+    gp.columns = [f"{a}|{b}" for a, b in gp.columns]
+    gp.reset_index().to_parquet(out / "ai_gpu_rental.parquet")
+    gp.columns = pd.MultiIndex.from_tuples([c.split("|") for c in gp.columns])
+    GP.latest(gp).to_parquet(out / "ai_gpu_latest.parquet")
+    gpu_fl = GP.flags(gp)
+fl = sorted(fl + C.flags(ch, tw) + cr_fl + s_fl + gpu_fl, key=lambda f: int(f["id"][1:]))
 sec = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
 (out / "ai_flags.json").write_text(json.dumps({"flags": fl, "latest_filed": str(sec["filed"].max().date())},
                                               ensure_ascii=False, indent=1), encoding="utf-8")

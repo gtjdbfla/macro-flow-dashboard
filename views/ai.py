@@ -389,6 +389,32 @@ with e2:
         st.markdown(f'<p class="note">{lm.month.max().strftime("%Y-%m")}월 기준. 하이퍼스케일러 투자가 공급사 매출로 가는 속도를 분기 공시보다 1~2개월 먼저 보여줍니다. '
                     f'이력은 수집을 시작한 시점부터 쌓입니다. 다음 확인: 매월 10일경, 분기 공시는 10월 말.</p>', unsafe_allow_html=True)
 
+gpu_p = load("results/ai_gpu_rental.parquet")
+gpu_l = load("results/ai_gpu_latest.parquet")
+if gpu_p is not None and gpu_l is not None and len(gpu_l):
+    ui.stage("공급", "GPU 임대가격은 공급과잉을 말하고 있나", "게시가격 기준 · 공급과잉 3가지를 구분")
+    f15 = fl.get("F15")
+    if f15:
+        st.markdown(badge(f15["level"], level_kind(f15["level"])) + f"**F15 {f15['title']}** — {f15['text']}", unsafe_allow_html=True)
+    g1, g2 = st.columns([1, 1.2], gap="large")
+    with g1:
+        st.markdown("**GPU별 시간당 임대가격** (달러, 전 세계 공급업체 평균)")
+        st.dataframe(pd.DataFrame({"GPU": gpu_l.gpu, "온디맨드": gpu_l.od.round(2), "7일 변화%": (gpu_l.od_7d * 100).round(1), "스팟": gpu_l.spot.round(2),
+                                   "스팟/온디맨드%": (gpu_l.spot_ratio * 100).round(0), "1년 약정 호가": gpu_l.yr1.round(2)}), hide_index=True, width="stretch")
+    with g2:
+        st.markdown("**온디맨드 가격 추이** (수집 시작 시점 = 100)")
+        gp = gpu_p.set_index("day")
+        fig = go.Figure()
+        for g, col in [("H100", "#8a99a3"), ("H200", "#5b8def"), ("B200", "#f97316"), ("B300", "#ee5555")]:
+            sr = gp[f"{g}|OD"].dropna()
+            fig.add_scatter(x=sr.index, y=sr / sr.iloc[0] * 100, name=g, mode="lines+markers", line=dict(color=col, width=2.4))
+        plot(fig, 260)
+    st.markdown(
+        "<p class=\"note\">공급과잉은 세 가지로 나뉩니다. <b>① 생산 과잉</b>(만든 GPU를 안 사감) · <b>② 가동 과잉</b>(팔렸지만 데이터센터에서 놀고 있음) · "
+        "<b>③ 투자 과잉</b>(가동률은 높아도 AI 수익으로 투자비를 못 갚음). 임대가격은 ②를 가장 직접 보여주고, ③은 위 CAPEX·FCF·조달 신호가, ①은 HBM·GPU 주문(무료 데이터 없음)이 봅니다.<br>"
+        "<b>한계</b>: 이 값은 공급업체가 <b>게시한 가격</b>이지 체결가가 아닙니다. 1년 약정 호가(약 5달러)는 실제 계약가(SemiAnalysis 조사 H100 1년 계약 2.35달러, 유료)와 큰 차이가 있어 수준이 아니라 <b>방향</b>만 봅니다. "
+        "공개 일별 이력이 2026-10-26부터라 35일이 쌓이기 전에는 F15를 판정하지 않으며(보류), 가동률·공급업체 차입 조건은 무료 데이터가 없습니다.</p>", unsafe_allow_html=True)
+
 with st.expander("경영진이 직접 공개한 AI 수치 (원문, 신뢰 등급 A)"):
     dd = disc.sort_values("filed", ascending=False).head(10)
     st.dataframe(pd.DataFrame({"회사": dd.ticker, "분기": dd.quarter_end.dt.strftime("%Y-%m"), "원문": dd.text}), hide_index=True, width="stretch")
