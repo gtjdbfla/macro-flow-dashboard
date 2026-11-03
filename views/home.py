@@ -115,8 +115,8 @@ def flow_detail():
     fig.update_yaxes(visible=False, row=1, col=1)
     fig.update_yaxes(autorange="reversed", row=2, col=1)
     plot(fig, 360, legend=False)
-    st.markdown('<p class="note">초록=자금 유입, 빨강=유출. 위 띠 색: 초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation. '
-                '더 긴 기간(2007~)은 <b>① 월가 자금</b> 페이지에서 봅니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">초록=자금 유입, 빨강=유출. 위 띠 색: 초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation. '
+                '더 긴 기간(2007~)은 <b>① 월가 자금</b> 페이지에서 봅니다.</p>')
 
     ui.stage("현재", "지금 자금은 어디로 들어오고 어디서 빠졌나", "최근 20일, 실제 ETF 설정·환매")
     a, b = st.columns([1.35, 1], gap="large")
@@ -135,14 +135,14 @@ def flow_detail():
         st.markdown(f"<table class='mini'><tr><th>섹터</th><th class='r'>20일 순자금</th><th class='r'>순자산 대비</th></tr>{rows(ins)}</table>", unsafe_allow_html=True)
         st.markdown("<div style='height:14px'></div>**가장 많이 빠진 3곳**", unsafe_allow_html=True)
         st.markdown(f"<table class='mini'><tr><th>섹터</th><th class='r'>20일 순자금</th><th class='r'>순자산 대비</th></tr>{rows(outs)}</table>", unsafe_allow_html=True)
-        st.markdown('<p class="note" style="margin-top:10px">금액은 큰 섹터(Technology·Financials)가, 비율은 작은 섹터(Materials·Utilities)가 두드러집니다. '
-                    '두 기준 모두 보세요.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note" style="margin-top:10px">금액은 큰 섹터(Technology·Financials)가, 비율은 작은 섹터(Materials·Utilities)가 두드러집니다. '
+                    '두 기준 모두 보세요.</p>')
 
     if hd is not None:
         st.markdown("#### 섹터별 대표 종목")
         st.markdown(ui.holdings_table(hd, list(etf.sort_values("flow_20d_usd", ascending=False)["name"])), unsafe_allow_html=True)
-        st.markdown(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 순서는 위 표와 같은 20일 순유입 금액순입니다. '
-                    '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>', unsafe_allow_html=True)
+        ui.note(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 순서는 위 표와 같은 20일 순유입 금액순입니다. '
+                    '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>')
     ui.stage("다음", "다음에 자금이 몰릴 곳 후보", "과거 백테스트 기준 · 근거 등급을 함께 봅니다")
     T = load("views/evidence_tests.parquet")
     en = load("views/evidence_now.json")
@@ -168,9 +168,9 @@ def flow_detail():
                     '<div class="chipl">효과는 거의 시가 갭에서 나오고 개장 후 초과수익은 확인되지 않았습니다.</div>')
     trio(card1, card2, card3)
     st.markdown(ui.grade_table(T), unsafe_allow_html=True)
-    st.markdown('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
+    ui.note('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
                 '등급 규칙: <b>검증됨</b> = 세 구간 같은 부호 + 2구간 이상 |t|≥2 + 전체 |t|≥3, <b>단서</b> = 전체 |t|≥2 + 2구간 이상 같은 부호, 나머지 <b>참고</b>. '
-                '호라이즌이 여럿이면 사전에 정한 대표 하나만 판정에 씁니다.</p>', unsafe_allow_html=True)
+                '호라이즌이 여럿이면 사전에 정한 대표 하나만 판정에 씁니다.</p>')
     callout("<b>이 근거들은 이미 본 과거 데이터에 대한 평가입니다.</b> 전향 장부(근거·방법 페이지)에 사전 등록해 앞으로 쌓이는 실제 데이터로 다시 확인합니다. "
             "팩터·산업 모멘텀은 <b>가격 추세</b>이지 자금 유입 데이터가 아니며, 학계에 알려진 뒤 약해지는 경향이 있습니다(산업 모멘텀은 2000년 이후 약화). "
             "한국 외국인 순매수 지속은 종목 단위로 다시 봐도 확인되지 않아 <b>참고</b>로 내렸고, 국면·상대강도로 섹터를 맞히는 것도 우연 수준입니다.")
@@ -231,8 +231,8 @@ def ai_detail():
         fig.update_layout(barmode="stack")
         fig.update_xaxes(type="category")
         plot(fig, 330)
-        st.markdown('<p class="note">Oracle은 결산월이 달라(분기말 8·11·2·5월) 가장 가까운 달력 분기에 맞췄습니다(약 1개월 차이). '
-                    'Big4가 모두 공시한 분기까지만 표시합니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">Oracle은 결산월이 달라(분기말 8·11·2·5월) 가장 가까운 달력 분기에 맞췄습니다(약 1개월 차이). '
+                    'Big4가 모두 공시한 분기까지만 표시합니다.</p>')
     with b:
         b4 = ha[ha.ticker.isin(["MSFT", "GOOGL", "AMZN", "META"])]
         items = [("CAPEX (쓴 돈)", b4.capex_delta.sum(), "#f97316"), ("영업현금흐름", b4.ocf_delta.sum(), "#5b8def"), ("매출", b4.rev_delta.sum(), "#8a99a3"),
@@ -261,8 +261,8 @@ def ai_detail():
     if fp is not None:
         st.markdown(ui.forecast_table(fp), unsafe_allow_html=True)
         f_ = fp.set_index("metric").loc["fcf"]
-        st.markdown(f'<p class="note">최근 분기 전년동기비 증가율이 최근 4분기 합계에 이어진다는 방법(과거 오차를 범위로 사용). <b>잉여현금흐름은 {f_.now_ttm/1e8:,.0f}억 → 약 {f_.proj/1e8:,.0f}억 달러</b>로 '
-                    '0 부근까지 줄어드는 쪽이며, CAPEX는 최근 실제가 전망보다 컸습니다(위쪽 위험). 근거 등급은 단서입니다.</p>', unsafe_allow_html=True)
+        ui.note(f'<p class="note">최근 분기 전년동기비 증가율이 최근 4분기 합계에 이어진다는 방법(과거 오차를 범위로 사용). <b>잉여현금흐름은 {f_.now_ttm/1e8:,.0f}억 → 약 {f_.proj/1e8:,.0f}억 달러</b>로 '
+                    '0 부근까지 줄어드는 쪽이며, CAPEX는 최근 실제가 전망보다 컸습니다(위쪽 위험). 근거 등급은 단서입니다.</p>')
     a, b = st.columns(2, gap="large")
     with a:
         st.markdown("**지금 경고·주의 신호**")
@@ -280,4 +280,4 @@ def ai_detail():
 
 
 detail()
-st.markdown('<p class="note">상단 메뉴: <b>① 월가 자금</b>(과거·현재·다음 전체), <b>② AI 수익성</b>(변화·시나리오), <b>갱신 현황</b>, <b>근거·방법</b>.</p>', unsafe_allow_html=True)
+ui.note('<p class="note">상단 메뉴: <b>① 월가 자금</b>(과거·현재·다음 전체), <b>② AI 수익성</b>(변화·시나리오), <b>갱신 현황</b>, <b>근거·방법</b>.</p>')

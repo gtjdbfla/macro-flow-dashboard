@@ -97,9 +97,9 @@ def history():
     fig.update_yaxes(visible=False, row=1, col=1)
     fig.update_yaxes(autorange="reversed", row=2, col=1)
     plot(fig, 440, legend=False)
-    st.markdown('<p class="note">행은 섹터 ETF, 색은 최근 20일 순 설정유입(초록=유입, 빨강=유출)입니다. 위쪽 띠는 그 시점의 매크로 국면 '
+    ui.note('<p class="note">행은 섹터 ETF, 색은 최근 20일 순 설정유입(초록=유입, 빨강=유출)입니다. 위쪽 띠는 그 시점의 매크로 국면 '
                 '(초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation). '
-                '국면별로 자금이 일정하게 같은 섹터로 갔다는 패턴은 통계로 확인되지 않았습니다(아래 "다음" 절).</p>', unsafe_allow_html=True)
+                '국면별로 자금이 일정하게 같은 섹터로 갔다는 패턴은 통계로 확인되지 않았습니다(아래 "다음" 절).</p>')
 
 
 history()
@@ -116,9 +116,8 @@ with left:
     with b:
         st.markdown("**SPY 대비 상대강도** (%p, 가격)")
         heat((order[["rs_1w", "rs_1m", "rs_3m"]] * 100).values, ["1주", "1개월", "3개월"], list(order["name"]), 8)
-    st.markdown('<p class="note">초록이 짙을수록 자금이 들어오거나 시장보다 강한 섹터입니다. 두 가지가 같은 방향이면 신호가 더 믿을 만하고, 엇갈리면 '
-                '가격은 올랐지만 자금은 빠지는 식의 구간입니다. 섹터 자금 신호의 이후 수익 예측력은 아직 확인되지 않았습니다.</p>',
-                unsafe_allow_html=True)
+    ui.note('<p class="note">초록이 짙을수록 자금이 들어오거나 시장보다 강한 섹터입니다. 두 가지가 같은 방향이면 신호가 더 믿을 만하고, 엇갈리면 '
+                '가격은 올랐지만 자금은 빠지는 식의 구간입니다. 섹터 자금 신호의 이후 수익 예측력은 아직 확인되지 않았습니다.</p>')
 with right:
     st.markdown("**기관 선물 포지션** (자산운용사, 이력 대비 백분위)")
     c = cf.dropna(subset=["am_rank"]).sort_values("am_rank")
@@ -126,12 +125,12 @@ with right:
                            text=[f"{v:.0f}" for v in c.am_rank], textposition="outside", hovertemplate="%{y}: %{x:.0f}분위<extra></extra>"))
     fig.update_xaxes(range=[0, 110])
     plot(fig, 380, legend=False)
-    st.markdown('<p class="note">S&P 섹터 E-mini 선물(CFTC 주간). 50보다 오른쪽이면 평소보다 순매수 쪽입니다. 화요일 기준·금요일 공표.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">S&P 섹터 E-mini 선물(CFTC 주간). 50보다 오른쪽이면 평소보다 순매수 쪽입니다. 화요일 기준·금요일 공표.</p>')
 if hd is not None:
     st.markdown("#### 섹터별 대표 종목")
     st.markdown(ui.holdings_table(hd, list(order["name"])), unsafe_allow_html=True)
-    st.markdown(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 위 히트맵과 같은 순서(1개월 순유입 순)입니다. '
-                '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>', unsafe_allow_html=True)
+    ui.note(f'<p class="note">섹터 ETF(SPDR) 공개 보유 종목 기준 {hd.as_of.iloc[0]:%Y-%m-%d}. 위 히트맵과 같은 순서(1개월 순유입 순)입니다. '
+                '시가총액 비중이라 소수 대형주가 섹터 움직임을 좌우합니다.</p>')
 with st.expander("산업·테마 ETF (반도체·은행·바이오·방산 등)"):
     t = ind.assign(flow_1m=ind.flow_1m * 100, rs_1m=ind.rs_1m * 100, rs_1w=ind.rs_1w * 100)[["name", "score", "direction", "flow_1m", "rs_1m", "rs_1w", "flow_src"]]
     st.dataframe(t.rename(columns={"name": "산업", "score": "점수", "direction": "방향", "flow_1m": "1M 순유입%", "rs_1m": "1M RS%p", "rs_1w": "1W RS%p",
@@ -145,14 +144,14 @@ st.markdown(badge("검증됨", "good") + badge("표본외 2023~ 기준", "mid"),
 st.markdown(kpis([("다음 한국 거래일 외국인 수급 (z)", f"{z:+.2f}", f"미국 마감 기준 · {zdir}"),
                   ("모델 표본외 상관", f"{ev_k['corr']:.2f}", f"설명력(R²) {ev_k['r2_vs_mean']:.2f} · 방향 힌트 수준"),
                   ("예측 최상위 vs 최하위 구간", f"{q.buy_prob.iloc[-1]:.0f}% vs {q.buy_prob.iloc[0]:.0f}%", "외국인 순매수 확률 (평소 약 47%)")]), unsafe_allow_html=True)
-st.markdown('<p class="note">입력: 미국 QQQ·SOXX·달러지수·실질금리 + 직전 한국 거래일 외국인 수급(모델 v2, 2026-10-14). 직전 수급을 더해 표본외 상관이 0.33에서 0.45로 올랐습니다(근거·방법 페이지).</p>', unsafe_allow_html=True)
+ui.note('<p class="note">입력: 미국 QQQ·SOXX·달러지수·실질금리 + 직전 한국 거래일 외국인 수급(모델 v2, 2026-10-14). 직전 수급을 더해 표본외 상관이 0.33에서 0.45로 올랐습니다(근거·방법 페이지).</p>')
 k1, k2, k3 = st.columns(3, gap="large")
 with k1:
     st.markdown("**예측 5분위별 외국인 순매수 확률 (%)**")
     fig = go.Figure(go.Bar(x=["Q1 약세", "Q2", "Q3", "Q4", "Q5 강세"], y=q.buy_prob, marker_color="#5b8def", text=[f"{v:.0f}%" for v in q.buy_prob], textposition="outside"))
     fig.update_yaxes(range=[0, 80])
     plot(fig, 320, legend=False)
-    st.markdown('<p class="note">2023년 이후 실제 결과. 예측값이 높은 구간일수록 순매수 확률이 높습니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">2023년 이후 실제 결과. 예측값이 높은 구간일수록 순매수 확률이 높습니다.</p>')
 with k2:
     st.markdown("**KOSPI 투자자별 순매수 누적 (최근 120거래일, 조원)**")
     d = kr_inv.tail(120)
@@ -161,8 +160,8 @@ with k2:
         fig.add_scatter(x=d.index, y=(d[col] / 1e6).cumsum(), name=nm, mode="lines")
     plot(fig, 320)
     gp = quint[quint.period == "oos"]
-    st.markdown(f'<p class="note">미국 신호가 맞히는 다음날 KOSPI 수익은 거의 시가 갭입니다(상위−하위 {gp.total_bp.iloc[-1]-gp.total_bp.iloc[0]:.0f}bp 중 갭 '
-                f'{gp.gap_bp.iloc[-1]-gp.gap_bp.iloc[0]:.0f}bp). 개장 후 추가 초과수익은 확인되지 않았습니다.</p>', unsafe_allow_html=True)
+    ui.note(f'<p class="note">미국 신호가 맞히는 다음날 KOSPI 수익은 거의 시가 갭입니다(상위−하위 {gp.total_bp.iloc[-1]-gp.total_bp.iloc[0]:.0f}bp 중 갭 '
+                f'{gp.gap_bp.iloc[-1]-gp.gap_bp.iloc[0]:.0f}bp). 개장 후 추가 초과수익은 확인되지 않았습니다.</p>')
 with k3:
     st.markdown("**한국 업종별 외국인 순매수 비중 (20일, 거래대금 대비 %)**")
     ks = kr_sec.sort_values("foreign_20d")
@@ -170,16 +169,15 @@ with k3:
                            text=[f"{v:+.1f}" for v in ks.foreign_20d], textposition="outside"))
     fig.update_xaxes(range=[min(-1, ks.foreign_20d.min() * 1.4), max(1, ks.foreign_20d.max() * 1.4)])
     plot(fig, 320, legend=False)
-    st.markdown('<p class="note">업종 대표 종목 3~4개 합산(KIS). 대표 종목은 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">업종 대표 종목 3~4개 합산(KIS). 대표 종목은 현재 대형주로 고정돼 과거 구성과 다를 수 있습니다.</p>')
 
 st.markdown("#### 다음에 몰릴 곳 — 확인된 수준별 정리")
 T = load("views/evidence_tests.parquet")
 en = load("views/evidence_now.json")
 st.markdown(ui.grade_table(T), unsafe_allow_html=True)
-st.markdown('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
+ui.note('<p class="note">구간: 미국 ETF·한국 종목은 2005–18 / 2019–22 / 2023~, 산업 모멘텀은 1927–62 / 1963–99 / 2000~, 팩터 모멘텀은 1963–89 / 1990–2009 / 2010~. '
             '<b>검증됨</b> = 세 구간 같은 부호 + 2구간 이상 |t|≥2 + 전체 |t|≥3, <b>단서</b> = 전체 |t|≥2 + 2구간 이상 같은 부호, 나머지 <b>참고</b>. '
-            '호라이즌이 여럿인 주장은 사전에 정한 대표 하나만 판정에 씁니다. 이 평가는 이미 본 과거 데이터에 대한 것이고, 전향 장부에서 다시 확인합니다.</p>',
-            unsafe_allow_html=True)
+            '호라이즌이 여럿인 주장은 사전에 정한 대표 하나만 판정에 씁니다. 이 평가는 이미 본 과거 데이터에 대한 것이고, 전향 장부에서 다시 확인합니다.</p>')
 f1, f2 = st.columns(2, gap="large")
 with f1:
     st.markdown(f"**팩터 12개월 누적 수익** ({en['asof'][:7]} 기준 · 팩터 모멘텀의 현재 신호)")
@@ -188,8 +186,8 @@ with f1:
                            text=[f"{v*100:+.0f}%" for v in fv.values], textposition="outside"))
     fig.update_xaxes(range=[min(-5, fv.min() * 100 * 1.5), max(5, fv.max() * 100 * 1.5)])
     plot(fig, 300, legend=False)
-    st.markdown('<p class="note">12개월 누적이 +인 팩터는 다음 달에도 +일 경향(월 평균 +0.2~0.3%p). 가치·소형·수익성·투자 팩터는 롱숏 포트폴리오 수익입니다. '
-                '효과가 작고 월별로 들쭉날쭉해, 방향 힌트로만 쓰세요. 데이터는 지난달까지입니다(발표 지연).</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">12개월 누적이 +인 팩터는 다음 달에도 +일 경향(월 평균 +0.2~0.3%p). 가치·소형·수익성·투자 팩터는 롱숏 포트폴리오 수익입니다. '
+                '효과가 작고 월별로 들쭉날쭉해, 방향 힌트로만 쓰세요. 데이터는 지난달까지입니다(발표 지연).</p>')
 with f2:
     st.markdown(f"**산업 12−1개월 모멘텀 상위·하위 5** ({en['asof'][:7]} 기준, 49개 산업)")
     top = [(ui.IND_KO.get(k.strip(), k), v) for k, v in en["industry_top"]]
@@ -197,7 +195,7 @@ with f2:
     rws = lambda L: "".join(f"<tr><td>{n}</td><td class='r'>{v*100:+.0f}%</td></tr>" for n, v in L)  # noqa: E731
     st.markdown(f"<table class='mini'><tr><th>많이 오른 산업</th><th class='r'>11개월 수익</th></tr>{rws(top)}</table><div style='height:10px'></div>"
                 f"<table class='mini'><tr><th>많이 못 오른 산업</th><th class='r'>11개월 수익</th></tr>{rws(bot)}</table>", unsafe_allow_html=True)
-    st.markdown('<p class="note">1927~1999년에는 강한 규칙(t 6)이었으나 2000년 이후는 약해졌습니다(t 1.4, 같은 방향). 미국 섹터 ETF(2005~)에서는 확인되지 않았습니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">1927~1999년에는 강한 규칙(t 6)이었으나 2000년 이후는 약해졌습니다(t 1.4, 같은 방향). 미국 섹터 ETF(2005~)에서는 확인되지 않았습니다.</p>')
 
 
 @st.fragment

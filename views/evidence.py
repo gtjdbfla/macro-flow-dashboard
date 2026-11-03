@@ -49,20 +49,18 @@ st.header("2. 등급을 어떻게 정했나 (같은 규칙으로 전부 다시 �
 st.markdown("**규칙**: 세 구간에서 부호가 같고 2구간 이상 |t|≥2이며 전체 |t|≥3이면 **검증됨**, 전체 |t|≥2이고 2구간 이상 같은 부호면 **단서**, 나머지는 **참고**. "
             "t는 Newey-West(겹치는 수익률 길이만큼), 횡단면 신호는 매 시점 스피어만 IC의 시간 평균입니다. 구간 끝의 미래 윈도우는 버립니다(purge).")
 st.markdown(ui.grade_table(T, only_primary=False), unsafe_allow_html=True)
-st.markdown('<p class="note">같은 주장을 여러 호라이즌으로 친 줄은 <b>대표 하나(사전 지정)만 등급에 쓰는</b> 표시를 둡니다. 보조 줄은 일관성 확인용이고, '
-            '예를 들어 미국 ETF 자금은 5일 후에서는 기계적으로 검증됨 기준을 넘지만 2019–22 효과가 거의 0이고 호라이즌을 사후에 고른 것이라 등급에 쓰지 않았습니다.</p>',
-            unsafe_allow_html=True)
+ui.note('<p class="note">같은 주장을 여러 호라이즌으로 친 줄은 <b>대표 하나(사전 지정)만 등급에 쓰는</b> 표시를 둡니다. 보조 줄은 일관성 확인용이고, '
+            '예를 들어 미국 ETF 자금은 5일 후에서는 기계적으로 검증됨 기준을 넘지만 2019–22 효과가 거의 0이고 호라이즌을 사후에 고른 것이라 등급에 쓰지 않았습니다.</p>')
 with st.expander("미국 ETF 자금 역방향은 어떤 조건에서 맞나 (탐색적 분해 · 20일 후)"):
     cc = cond.copy()
     st.dataframe(pd.DataFrame({"조건": cc.condition, "2005–18 IC": cc.train_mean, "t": cc.train_t, "2019–22 IC": cc.val_mean, "t ": cc.val_t,
                                "2023~ IC": cc.test_mean, "t  ": cc.test_t, "전체 t": cc.all_t}).round(2), hide_index=True, width="stretch")
-    st.markdown('<p class="note">조건 6개를 사후에 나눠 본 탐색입니다(다중 비교). 가장 일관된 것은 VIX 순위가 낮은 구간(세 구간 모두 음수)이며, 가설 H5로 전향 장부에 등록했습니다.</p>',
-                unsafe_allow_html=True)
+    ui.note('<p class="note">조건 6개를 사후에 나눠 본 탐색입니다(다중 비교). 가장 일관된 것은 VIX 순위가 낮은 구간(세 구간 모두 음수)이며, 가설 H5로 전향 장부에 등록했습니다.</p>')
 with st.expander("한국 전달 모델 입력 후보 비교 (train 적합 → val로 선택 → test 한 번)"):
     st.dataframe(pd.DataFrame({"입력 세트": k2.set, "검증 상관": k2.val_corr, "검증 설명력": k2.val_r2, "표본외 상관": k2.test_corr, "표본외 설명력": k2.test_r2}).round(3),
                  hide_index=True, width="stretch")
-    st.markdown('<p class="note">후보 4세트를 미리 정하고 검증 구간에서 가장 좋은 것(C: 직전 한국 외국인 수급 추가)을 골랐습니다. 외국인 수급이 하루 단위로 이어지는 성질을 반영한 것이며, '
-                '원/달러·HYG·VIX를 더한 D는 개선이 없었습니다. 표본외 설명력은 약 20%로 올랐으나 여전히 방향 힌트 수준입니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">후보 4세트를 미리 정하고 검증 구간에서 가장 좋은 것(C: 직전 한국 외국인 수급 추가)을 골랐습니다. 외국인 수급이 하루 단위로 이어지는 성질을 반영한 것이며, '
+                '원/달러·HYG·VIX를 더한 D는 개선이 없었습니다. 표본외 설명력은 약 20%로 올랐으나 여전히 방향 힌트 수준입니다.</p>')
 
 st.header("3. AI 수익성 모듈의 신뢰도")
 st.markdown("""
@@ -88,8 +86,8 @@ if _fe is not None:
         _pv = _t.pivot_table(index=["metric", "method"], columns="period", values="값", aggfunc="first")[["2016–19", "2020–22", "2023~", "전체"]].reset_index()
         _pv["metric"] = _pv.metric.map({"capex": "CAPEX", "ocf": "영업현금흐름", "revenue": "매출", "op_income": "영업이익", "fcf": "FCF(영업현금흐름 대비 %p)"})
         st.dataframe(_pv.rename(columns={"metric": "지표", "method": "방법"}), hide_index=True, width="stretch")
-        st.markdown('<p class="note">각 칸은 <b>편향 / RMSE</b>(다음 4분기 합계의 로그 오차). 0에 가까운 편향이 좋습니다. "최근 분기 YoY 지속"이 매출·영업현금흐름·영업이익에서 가장 덜 치우쳤고, '
-                    'CAPEX는 2023년 이후 15% 낮게 맞혔습니다. 방법을 5개 중 최선으로 골랐고 4분기 창이 겹쳐 독립 표본이 약 9개라 등급은 단서입니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">각 칸은 <b>편향 / RMSE</b>(다음 4분기 합계의 로그 오차). 0에 가까운 편향이 좋습니다. "최근 분기 YoY 지속"이 매출·영업현금흐름·영업이익에서 가장 덜 치우쳤고, '
+                    'CAPEX는 2023년 이후 15% 낮게 맞혔습니다. 방법을 5개 중 최선으로 골랐고 4분기 창이 겹쳐 독립 표본이 약 9개라 등급은 단서입니다.</p>')
 
 st.header("4. 전향 검증 장부")
 L = ev.get("ledger", {})
@@ -106,5 +104,4 @@ if L.get("n_days"):
 
 st.header("5. 데이터 출처와 갱신")
 st.markdown("갱신 일정, 소스별 신선도, 최근 실행 이력은 **갱신 현황** 페이지에서 봅니다.")
-st.markdown('<p class="note">전체 방법론·규칙: GitHub gtjdbfla/macro-flow-dashboard 의 docs/DESIGN · FEATURES · BACKTEST · RESULTS_SUMMARY · AI_PROFITABILITY · FORWARD_TEST.</p>',
-            unsafe_allow_html=True)
+ui.note('<p class="note">전체 방법론·규칙: GitHub gtjdbfla/macro-flow-dashboard 의 docs/DESIGN · FEATURES · BACKTEST · RESULTS_SUMMARY · AI_PROFITABILITY · FORWARD_TEST.</p>')

@@ -77,7 +77,22 @@ h3{font-size:1.2rem!important;margin:1.2rem 0 .5rem!important}
 .flow3 div.c .tag{margin-bottom:5px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;font-size:.86rem;color:#8a99a3;margin:.1rem 0 .6rem}
 div[data-testid="stMetricValue"]{font-size:1.6rem}
+[data-testid="stPopover"] button{padding:.15rem .7rem;min-height:0;font-size:.82rem;opacity:.8}
+.verdict{border:1px solid #64748b44;border-radius:14px;padding:16px 20px;margin:.2rem 0 .8rem;font-size:1.05rem;line-height:1.65}
 @media (max-width:1100px){.duo,.trio,.chain,.flow3{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+/* 모바일: 여백·글자 줄이고, 넓은 표는 가로 스크롤, 카드는 한 줄씩 */
+@media (max-width:760px){
+.block-container{padding:3.4rem .9rem 3rem}
+h1{font-size:1.55rem!important}
+[data-testid="stMarkdownContainer"] p,[data-testid="stMarkdownContainer"] li{font-size:.95rem;line-height:1.62}
+.lede{font-size:1rem}
+.stage{flex-wrap:wrap;font-size:1.12rem;gap:6px 10px;margin-top:1.6rem}
+.purpose{padding:14px 15px}.purpose .q{font-size:1.08rem}.purpose .a{font-size:.97rem}
+.sum,.ev{padding:15px 16px}.ev .big{font-size:1.7rem}.kpi .v{font-size:1.25rem}
+.mini{display:block;overflow-x:auto;white-space:nowrap;font-size:.85rem}
+.verdict{font-size:.97rem;padding:13px 14px}
+.step{padding:13px 14px}
+}
 </style>
 """
 
@@ -179,10 +194,21 @@ def stage(tag: str, title: str, sub: str = ""):
 
 
 def purpose(question: str, answer: str, steps, badges: str = ""):
-    """페이지 맨 위 목적 배너: 질문 → 한 줄 답 → 이 페이지가 보여주는 과거/현재/다음. steps=[(태그, 설명)]."""
+    """페이지 맨 위 목적 배너: 질문 → 한 줄 답. 과거/현재/다음 안내(steps=[(태그, 설명)])는 '설명' 버튼을 눌러야 보인다."""
+    st.markdown(f'<div class="purpose"><div class="q">{question}</div><div>{badges}</div><div class="a">{answer}</div></div>', unsafe_allow_html=True)
     cells = "".join(f'<div class="c"><span class="tag {TAGS[t]}">{t}</span><br>{d}</div>' for t, d in steps)
-    st.markdown(f'<div class="purpose"><div class="q">{question}</div><div>{badges}</div><div class="a">{answer}</div><div class="flow3">{cells}</div></div>',
-                unsafe_allow_html=True)
+    explain(f'<div class="flow3">{cells}</div>', "ⓘ 이 페이지 구성")
+
+
+def explain(md: str, label: str = "ⓘ 설명"):
+    """긴 설명은 평소에 숨기고 버튼을 눌렀을 때만 보인다(모바일에서 화면이 설명으로 차는 것을 막는다)."""
+    with st.popover(label):
+        st.markdown(md, unsafe_allow_html=True)
+
+
+def note(html: str):
+    """각주·한계·읽는 법. 본문에 늘어놓지 않고 버튼 뒤에 둔다."""
+    explain(html, "ⓘ 설명")
 
 
 def legend():
@@ -273,7 +299,7 @@ def forecast_table(fp):
             "<th class='r'>범위(과거 오차 ±1배)</th><th class='r'>최근 편향(2023~)</th></tr>" + "".join(rows) + "</table>")
 
 
-def howto(info_md: str, pred_md: str, title: str = "이 탭으로 알 수 있는 것 · 미래를 어떻게 예측하나", expanded: bool = True):
+def howto(info_md: str, pred_md: str, title: str = "ⓘ 이 탭으로 알 수 있는 것 · 미래를 어떻게 예측하나", expanded: bool = False):
     """탭 상단 설명: 왼쪽 '알 수 있는 정보(데이터·한계)', 오른쪽 '미래 예측 방식(방법·정확도·한계)'. 마크다운 + 배지 HTML."""
     with st.expander(title, expanded=expanded):
         a, b = st.columns(2, gap="large")

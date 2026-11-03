@@ -35,6 +35,13 @@ ui.purpose("AI 기업의 수익성은 어떻게 변해 왔고, 지금 어떤 상
            badge("현황판 · 예측 아님", "warn"))
 ui.freshness(meta)
 
+_sig = {k: v["level"] for k, v in fl.items()}
+_bad = [f"{k} {fl[k]['title']}" for k in fl if level_kind(fl[k]["level"]) in ("bad", "warn")]
+_good = [k for k in fl if level_kind(fl[k]["level"]) == "good"]
+st.markdown(
+    '<div class="verdict"><b>한 줄 요약</b> — 수요(수주·공급사 매출·클라우드 성장)는 강하지만, 투자가 매출보다 빨라 회수와 현금창출이 약해지고 조달 부담이 커지는 쪽입니다.<br>'
+    f'<span class="muted">긍정 신호 {len(_good)}개 · 주의/경고 {len(_bad)}개: ' + (", ".join(_bad) if _bad else "없음") + "</span></div>", unsafe_allow_html=True)
+
 _fp = load("views/ai_forecast.parquet")
 if _fp is not None:
     _Pf = _fp.set_index("metric")
@@ -122,11 +129,30 @@ with b:
     fig.add_scatter(x=ca.quarter_end, y=ca.margin * 100, name="영업이익률(%)", mode="lines+markers", line=dict(color="#f59e0b", width=2.4))
     plot(fig, 300)
 
+c1, c2 = st.columns(2, gap="large")
+b4l = hist[hist.ticker == "BIG4"].sort_values("period_end")
+b4l = b4l[b4l.period_end >= "2018-01-01"]
+with c1:
+    st.markdown("**번 돈보다 쓰는 돈이 빨라진다** (Big4 12개월 합, 억 달러)")
+    fig = go.Figure()
+    fig.add_scatter(x=b4l.period_end, y=b4l.ocf_ttm / 1e8, name="영업현금흐름", mode="lines", line=dict(color="#22a55a", width=2.6))
+    fig.add_scatter(x=b4l.period_end, y=b4l.capex_ttm / 1e8, name="CAPEX", mode="lines", line=dict(color="#f97316", width=2.6),
+                    fill="tonexty", fillcolor="rgba(238,85,85,0.18)")
+    plot(fig, 280)
+    ui.note("두 선 사이 붉은 영역이 CAPEX가 영업현금흐름을 넘는 구간(잉여현금흐름 적자)입니다. 아직 CAPEX가 아래에 있으면 번 돈 안에서 투자하고 있다는 뜻입니다.")
+with c2:
+    st.markdown("**투자 1달러가 늘린 영업이익** (Big4, 달러)")
+    fig = go.Figure()
+    _r = hist[hist.ticker == "BIG4"].dropna(subset=["opinc_per_capex"]).sort_values("period_end")
+    fig.add_scatter(x=_r.period_end, y=_r.opinc_per_capex, name="투자회수", mode="lines", line=dict(color="#5b8def", width=2.6))
+    fig.add_hline(y=float(_r.opinc_per_capex.quantile(1 / 3)), line_dash="dot", line_color="#ee5555", annotation_text="자기 이력 하위 1/3 (F2 경고선)", annotation_position="bottom right")
+    plot(fig, 280, legend=False)
+    ui.note("1년 전 CAPEX 1달러가 이후 1년간 늘린 영업이익입니다. 점선 아래면 과거 평균보다 투자 효율이 낮은 구간입니다.")
+
 # ── 현재 ────────────────────────────────────────────────────────────────────
 ui.stage("현재", "지금 네 단계는 어떤 상태인가", "투자 → 수요 → 이익·현금 → 조달")
 st.markdown(html, unsafe_allow_html=True)
-st.markdown('<p class="note">상태 판정은 사전에 고정한 규칙의 신호 10개를 단계별로 묶은 것입니다(근거·방법 페이지). 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>',
-            unsafe_allow_html=True)
+ui.note('<p class="note">상태 판정은 사전에 고정한 규칙의 신호 10개를 단계별로 묶은 것입니다(근거·방법 페이지). 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>')
 c, d = st.columns([1.25, 1], gap="large")
 with c:
     st.markdown("**회사별 현황**")
@@ -138,7 +164,7 @@ with c:
                         "CAPEX/OCF": np.where(t.ticker == "NVDA", np.nan, t.capex_ocf)})
     st.dataframe(tab.round(1), hide_index=True, width="stretch", height=330,
                  column_config={"CAPEX(억$)": st.column_config.NumberColumn(format="%.0f"), "FCF(억$)": st.column_config.NumberColumn(format="%.0f")})
-    st.markdown('<p class="note">NVIDIA는 투자를 받는 쪽이라 CAPEX/OCF를 비웠고, 적자 기업(코어위브)의 영업이익 증가율은 비웠습니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">NVIDIA는 투자를 받는 쪽이라 CAPEX/OCF를 비웠고, 적자 기업(코어위브)의 영업이익 증가율은 비웠습니다.</p>')
 with d:
     @st.fragment
     def spread_chart():
@@ -152,7 +178,7 @@ with d:
     spread_chart()
     crwv = issu[issu.ticker == "CRWV"].sort_values("filed")
     if len(crwv):
-        st.markdown('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>", unsafe_allow_html=True)
+        ui.note('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
@@ -164,10 +190,10 @@ if slt is not None:
     soas = load("views/ai_credit_oas.parquet")
     st.markdown("#### 안전성 — 빚을 감당할 수 있나 (CDS를 대신하는 신용 지표)")
     st.markdown(ui.safety_table(slt, srcc), unsafe_allow_html=True)
-    st.markdown('<p class="note">억 달러. <b>CDS 시세는 무료 데이터가 없어</b> 공시(부채·리스·현금·이자)와 가격으로 대신 계산합니다. '
+    ui.note('<p class="note">억 달러. <b>CDS 시세는 무료 데이터가 없어</b> 공시(부채·리스·현금·이자)와 가격으로 대신 계산합니다. '
                 '<b>유동성 런웨이</b> = 현금 ÷ (FCF 적자 + 12개월 내 원금 만기): 신규 조달 없이 버틸 수 있는 기간(미사용 한도·계약 자금 미반영). '
                 '<b>RPO ÷ 부채</b>: 계약 매출잔고가 부채+리스의 몇 배인가(고객 신용도는 반영 안 됨). '
-                '<b>증분 ROIC</b> = 2022년 대비 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX(낙관적 계산).</p>', unsafe_allow_html=True)
+                '<b>증분 ROIC</b> = 2022년 대비 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX(낙관적 계산).</p>')
     g1, g2 = st.columns(2, gap="large")
     with g1:
         st.markdown("**주가로 추정한 신용 스트레스** (Merton 5년 내재 스프레드, bp · CDS 아님)")
@@ -178,8 +204,8 @@ if slt is not None:
                 fig.add_scatter(x=g.date, y=g.spread_bp, name=nm, mode="lines+markers")
             fig.update_yaxes(type="log", title="bp (로그)")
             plot(fig, 300)
-        st.markdown('<p class="note">주식가치·변동성·부채·리스로 계산한 모형값입니다. 실제 신규 발행과 비교하면 수준이 맞지 않아(Oracle은 낮게, CoreWeave는 2배 이상 높게) '
-                    '<b>수준이 아니라 방향만 참고</b>하세요. 빅테크 4사는 거의 0이라 그리지 않았습니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">주식가치·변동성·부채·리스로 계산한 모형값입니다. 실제 신규 발행과 비교하면 수준이 맞지 않아(Oracle은 낮게, CoreWeave는 2배 이상 높게) '
+                    '<b>수준이 아니라 방향만 참고</b>하세요. 빅테크 4사는 거의 0이라 그리지 않았습니다.</p>')
     with g2:
         st.markdown("**신용등급대별 시장 스프레드** (ICE BofA OAS, bp · 최근 3년 범위)")
         if soas is not None and len(soas):
@@ -188,8 +214,8 @@ if slt is not None:
             fig.add_scatter(x=soas.bucket, y=soas.now, mode="markers+text", name="지금", marker=dict(size=13, color="#f59e0b"),
                             text=[f"{v:,.0f} ({p:.0f}백분위)" for v, p in zip(soas.now, soas.pct)], textposition="middle right")
             plot(fig, 300)
-        st.markdown('<p class="note">Oracle은 BBB급, CoreWeave는 HY(BB~B)급에 가까운 조달 환경입니다. 지금 가장 도드라진 곳은 CCC 스프레드가 3년 내 최고라는 점이고, '
-                    'BBB는 중간 수준입니다(저신용 쪽만 긴장).</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">Oracle은 BBB급, CoreWeave는 HY(BB~B)급에 가까운 조달 환경입니다. 지금 가장 도드라진 곳은 CCC 스프레드가 3년 내 최고라는 점이고, '
+                    'BBB는 중간 수준입니다(저신용 쪽만 긴장).</p>')
 
     shs = load("views/ai_safety_history.parquet")
     simp = load("views/ai_safety_impact.parquet")
@@ -213,7 +239,7 @@ if slt is not None:
                 g = shs[(shs.ticker == tk)].dropna(subset=["int_ebit"])
                 fig.add_scatter(x=g.pe, y=g.int_ebit * 100, name=nmr[tk], mode="lines+markers", line=dict(color=colr[tk]))
             plot(fig, 270)
-            st.markdown('<p class="note">CoreWeave는 영업적자라 비율을 낼 수 없습니다(이자가 이익을 전부 넘음).</p>', unsafe_allow_html=True)
+            ui.note('<p class="note">CoreWeave는 영업적자라 비율을 낼 수 없습니다(이자가 이익을 전부 넘음).</p>')
         with k3:
             st.markdown("**유동성 런웨이** (년, 로그 눈금)")
             fig = go.Figure()
@@ -224,7 +250,7 @@ if slt is not None:
             plot(fig, 270)
         ib, io, ic = (simp.set_index("ticker").loc[t] for t in ("BIG4", "ORCL", "CRWV"))
         st.markdown("#### 이 금융 조건이 AI 수익성에 주는 영향")
-        st.markdown(
+        ui.explain(
             f"- **빅테크 4사 (영향 작음)**: 빚이 2년 만에 크게 늘어 순현금에서 순부채로 넘어갔고 이자도 +{ib.interest_yoy*100:.0f}% 늘었지만, 이자는 영업이익의 {ib.int_ebit*100:.1f}%에 불과합니다. "
             f"이익을 깎는 것보다 **투자 여력(FCF)과 재무 유연성이 줄어드는 쪽**의 영향이 큽니다. 지난 1년 CAPEX 중 외부 자금(순부채 증가)으로 댄 몫은 {ib.debt_funded*100:.0f}%로, 대부분 영업현금과 보유 현금으로 충당했습니다.\n"
             f"- **Oracle (이익의 약 {io.int_ebit*100:.0f}%가 이자)**: 이자비용이 +{io.interest_yoy*100:.0f}% 늘었고(영업이익은 +{io.ebit_yoy*100:.0f}%), 이자보상은 {io.cov_1y:.1f}배 → {io['cov']:.1f}배로 보합입니다. 영업이익이 같이 늘어 버티고 있지만, "
@@ -232,7 +258,7 @@ if slt is not None:
             f"- **CoreWeave (이자가 이익을 모두 삼킴)**: 영업이익이 적자라 이자보상배율이 마이너스입니다. 이자는 +{ic.interest_yoy*100:.0f}% 늘었고(자산화된 이자 제외 보고치), 부채가 빠르게 늘어 순부채÷영업현금흐름은 개선됐지만({ic.nd_ocf_1y:.0f}배 → {ic.nd_ocf:.1f}배) 이는 영업현금흐름이 커진 덕입니다. "
             f"런웨이 {ic.runway:.2f}년으로 조달 시장이 닫히면 가장 먼저 영향을 받습니다.\n"
             "- **전달 경로**: 조달 금리 상승 → 이자비용 증가 → 영업이익 대비 이자 부담 상승 → 투자 속도 조절 압력. 빅테크는 이 경로가 약하고, 차입 의존 기업은 강합니다.")
-        st.markdown('<p class="note">이자·부채는 SEC 공시 값이며, CoreWeave는 이자 일부를 자산으로 처리해(자본화) 보고 이자가 실제 금리보다 낮게 나옵니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">이자·부채는 SEC 공시 값이며, CoreWeave는 이자 일부를 자산으로 처리해(자본화) 보고 이자가 실제 금리보다 낮게 나옵니다.</p>')
 
     smat = load("views/ai_debt_maturity.parquet")
     sval = load("views/ai_valuation.parquet")
@@ -250,23 +276,23 @@ if slt is not None:
             fig.update_layout(barmode="stack")
             plot(fig, 320)
             _o = smat[(smat.ticker == "ORCL") & (smat.bucket != "5년 초과")].amount.sum() / 1e8
-            st.markdown(f'<p class="note">Oracle은 앞으로 5년 안에 약 {_o:,.0f}억 달러, 그 뒤 {smat[(smat.ticker=="ORCL")&(smat.bucket=="5년 초과")].amount.iloc[0]/1e8:,.0f}억 달러가 만기입니다. '
-                        '대부분 차환(새 빚으로 갚기)이 전제라, 시장이 닫히면 이 사다리가 부담이 됩니다. 기준일은 각 회사의 최신 10-K입니다.</p>', unsafe_allow_html=True)
+            ui.note(f'<p class="note">Oracle은 앞으로 5년 안에 약 {_o:,.0f}억 달러, 그 뒤 {smat[(smat.ticker=="ORCL")&(smat.bucket=="5년 초과")].amount.iloc[0]/1e8:,.0f}억 달러가 만기입니다. '
+                        '대부분 차환(새 빚으로 갚기)이 전제라, 시장이 닫히면 이 사다리가 부담이 됩니다. 기준일은 각 회사의 최신 10-K입니다.</p>')
     with h2:
         st.markdown("**시장은 이 회사들을 어떻게 값매기나** (밸류에이션·시장 스트레스)")
         if sval is not None and len(sval):
             st.markdown(ui.valuation_table(sval), unsafe_allow_html=True)
-            st.markdown('<p class="note">시총 = 최근 종가 × 최근 희석 주식수. FCF 수익률이 마이너스면 잉여현금흐름이 적자라는 뜻입니다. '
+            ui.note('<p class="note">시총 = 최근 종가 × 최근 희석 주식수. FCF 수익률이 마이너스면 잉여현금흐름이 적자라는 뜻입니다. '
                         '<b>CAPEX ÷ 시총</b>이 클수록 시총에 비해 투자 규모가 크다는 뜻으로, Oracle·CoreWeave에서 두드러집니다. '
-                        '주가가 52주 고점에서 크게 내려온 것(Oracle ' + f"{sval[sval.ticker=='ORCL'].dd52.iloc[0]*100:.0f}%, CoreWeave {sval[sval.ticker=='CRWV'].dd52.iloc[0]*100:.0f}%" + ')은 시장이 이 투자·차입 구조에 이미 의문을 반영했다는 신호입니다.</p>', unsafe_allow_html=True)
+                        '주가가 52주 고점에서 크게 내려온 것(Oracle ' + f"{sval[sval.ticker=='ORCL'].dd52.iloc[0]*100:.0f}%, CoreWeave {sval[sval.ticker=='CRWV'].dd52.iloc[0]*100:.0f}%" + ')은 시장이 이 투자·차입 구조에 이미 의문을 반영했다는 신호입니다.</p>')
     if sv is not None and len(sv):
         with st.expander("주가 기반 추정은 실제 발행 조건과 얼마나 맞나 (검증)"):
             vv = sv.copy()
             vv["비율(추정÷실제)"] = vv.merton_bp / vv.issued_bp
             st.dataframe(pd.DataFrame({"회사": vv.ticker, "발행일": pd.to_datetime(vv.date).dt.strftime("%Y-%m-%d"), "실제 발행 스프레드 bp(CoreWeave는 쿠폰−UST 5Y)": vv.issued_bp.round(0),
                                        "같은 시점 Merton bp": vv.merton_bp.round(0), "비율(추정÷실제)": vv["비율(추정÷실제)"].round(2)}), hide_index=True, width="stretch")
-            st.markdown('<p class="note">표본이 5건뿐이라 상관을 내지 못합니다. Oracle은 실제보다 훨씬 낮게(과거 부채가 적게 반영된 시점), CoreWeave는 약 2.3배 높게 나왔습니다. '
-                        '그래서 이 지표는 <b>참고</b> 등급이며, 같은 회사의 추세 변화만 봅니다.</p>', unsafe_allow_html=True)
+            ui.note('<p class="note">표본이 5건뿐이라 상관을 내지 못합니다. Oracle은 실제보다 훨씬 낮게(과거 부채가 적게 반영된 시점), CoreWeave는 약 2.3배 높게 나왔습니다. '
+                        '그래서 이 지표는 <b>참고</b> 등급이며, 같은 회사의 추세 변화만 봅니다.</p>')
 
 # ── 다음 ────────────────────────────────────────────────────────────────────
 ui.stage("다음", "앞으로 — 다음 12개월 기준선 전망과 두 가지 도구")
@@ -278,32 +304,36 @@ if fp is not None:
     _e = pd.Timestamp(P.loc["capex"].last_q_end)
     st.markdown(badge("기준선 전망", "info") + badge("단서", "warn") + f"**Big4 다음 12개월 ({(_e + pd.offsets.MonthBegin(1)):%Y-%m} ~ {(_e + pd.DateOffset(months=12)):%Y-%m})**", unsafe_allow_html=True)
     fc = P.loc["fcf"]
-    st.markdown(f'<p class="lede">지금 증가율이 그대로 이어지면 다음 12개월에 Big4는 <b>CAPEX {P.loc["capex"].proj/1e8:,.0f}억 달러(+{P.loc["capex"].growth*100:.0f}%)</b>, '
+    ui.explain(f'<p class="lede">지금 증가율이 그대로 이어지면 다음 12개월에 Big4는 <b>CAPEX {P.loc["capex"].proj/1e8:,.0f}억 달러(+{P.loc["capex"].growth*100:.0f}%)</b>, '
                 f'매출 {P.loc["revenue"].proj/1e8:,.0f}억(+{P.loc["revenue"].growth*100:.0f}%), 영업현금흐름 {P.loc["ocf"].proj/1e8:,.0f}억(+{P.loc["ocf"].growth*100:.0f}%)입니다. '
                 f'그러면 <b>잉여현금흐름은 {fc.now_ttm/1e8:,.0f}억 → 약 {fc.proj/1e8:,.0f}억 달러</b>(범위 {fc.lo/1e8:,.0f} ~ {fc.hi/1e8:,.0f})로 0 부근까지 줄어듭니다. '
-                f'가장 최근 분기({_e:%Y-%m})만 보면 이미 영업현금흐름 {P.loc["ocf"].last_q/1e8:,.0f}억 − CAPEX {P.loc["capex"].last_q/1e8:,.0f}억 = 약 {fc.last_q/1e8:,.0f}억 달러입니다.</p>', unsafe_allow_html=True)
+                f'가장 최근 분기({_e:%Y-%m})만 보면 이미 영업현금흐름 {P.loc["ocf"].last_q/1e8:,.0f}억 − CAPEX {P.loc["capex"].last_q/1e8:,.0f}억 = 약 {fc.last_q/1e8:,.0f}억 달러입니다.</p>', "ⓘ 전망 해설")
     f1, f2 = st.columns([1.25, 1], gap="large")
     with f1:
         st.markdown(ui.forecast_table(fp), unsafe_allow_html=True)
-        st.markdown('<p class="note"><b>방법</b>: 최근 분기의 전년동기비 증가율이 최근 4분기 합계에 그대로 이어진다고 가정. 5개 단순 방법을 같은 원점에서 비교해 가장 덜 치우친 것을 골랐고, '
+        ui.note('<p class="note"><b>방법</b>: 최근 분기의 전년동기비 증가율이 최근 4분기 합계에 그대로 이어진다고 가정. 5개 단순 방법을 같은 원점에서 비교해 가장 덜 치우친 것을 골랐고, '
                     '그 방법의 과거 오차(RMSE)를 범위 폭으로 씁니다. 4분기 창이 겹쳐 독립 표본은 약 9개라 범위는 거친 추정입니다. '
-                    '<b>CAPEX는 2023년 이후 실제가 전망보다 약 15% 컸고</b>(위쪽 위험), FCF 전망은 최근 실제보다 높게 나오는 경향(12%p)이 있어 아래쪽 위험이 있습니다.</p>', unsafe_allow_html=True)
+                    '<b>CAPEX는 2023년 이후 실제가 전망보다 약 15% 컸고</b>(위쪽 위험), FCF 전망은 최근 실제보다 높게 나오는 경향(12%p)이 있어 아래쪽 위험이 있습니다.</p>')
     with f2:
-        names = ["CAPEX", "영업현금흐름", "잉여현금흐름"]
-        keys = ["capex", "ocf", "fcf"]
         fig = go.Figure()
-        fig.add_bar(name="최근 12개월", x=names, y=[P.loc[k].now_ttm / 1e8 for k in keys], marker_color="#8a99a3")
-        fig.add_bar(name="다음 12개월 전망", x=names, y=[P.loc[k].proj / 1e8 for k in keys], marker_color="#5b8def",
-                    error_y=dict(type="data", symmetric=False, array=[(P.loc[k].hi - P.loc[k].proj) / 1e8 for k in keys], arrayminus=[(P.loc[k].proj - P.loc[k].lo) / 1e8 for k in keys]))
-        fig.update_layout(barmode="group")
+        _h = hist[hist.ticker == "BIG4"].sort_values("period_end")
+        _h = _h[_h.period_end >= "2021-01-01"]
+        _t1 = _e + pd.DateOffset(months=12)
+        for k, nm, col, ycol in [("capex", "CAPEX", "#f97316", "capex_ttm"), ("ocf", "영업현금흐름", "#22a55a", "ocf_ttm"), ("fcf", "잉여현금흐름", "#5b8def", "fcf_ttm")]:
+            fig.add_scatter(x=_h.period_end, y=_h[ycol] / 1e8, name=nm, mode="lines", line=dict(color=col, width=2.6))
+            fig.add_scatter(x=[_e, _t1], y=[P.loc[k].now_ttm / 1e8, P.loc[k].proj / 1e8], name=nm + " 전망", mode="lines+markers", showlegend=False,
+                            line=dict(color=col, width=2.2, dash="dot"),
+                            error_y=dict(type="data", symmetric=False, visible=True, array=[0, (P.loc[k].hi - P.loc[k].proj) / 1e8], arrayminus=[0, (P.loc[k].proj - P.loc[k].lo) / 1e8]))
+        fig.add_vline(x=_e, line_dash="dot", line_color="rgba(138,153,163,.6)")
         plot(fig, 300)
+        ui.note("실선은 공시된 12개월 합, 점선은 기준선 전망(오차 범위 막대)입니다. 세로 점선이 마지막 공시 분기입니다.")
     if fn is not None:
         with st.expander("더 정교한 예측 변수는 기준선을 넘지 못했습니다 (수주잔고·NVIDIA 매출·평균회귀 모델)"):
             st.dataframe(pd.DataFrame({"검정": fn.test, "표본": fn.n, "결과": fn.result, "판정": fn.verdict, "이유": fn.why}), hide_index=True, width="stretch")
-    st.markdown('<p class="note">아래 두 도구는 이 기준선 대신 <b>직접 가정</b>을 넣어 보는 시나리오(왼쪽)와, 다음에 확인될 선행 지표(오른쪽)입니다.</p>', unsafe_allow_html=True)
+    ui.note('<p class="note">아래 두 도구는 이 기준선 대신 <b>직접 가정</b>을 넣어 보는 시나리오(왼쪽)와, 다음에 확인될 선행 지표(오른쪽)입니다.</p>')
 
-st.markdown('<p class="note">이 지표들은 주가를 예측한 적이 없습니다(이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못함). '
-            '대신 가정을 직접 넣어 결과를 보는 산식 시나리오와, 다음에 확인될 선행 지표를 제공합니다.</p>', unsafe_allow_html=True)
+ui.note('<p class="note">이 지표들은 주가를 예측한 적이 없습니다(이벤트 스터디에서 CAPEX 가속·감속이 반도체 수익을 구분하지 못함). '
+            '대신 가정을 직접 넣어 결과를 보는 산식 시나리오와, 다음에 확인될 선행 지표를 제공합니다.</p>')
 
 fin_in = load("views/ai_fin_inputs.parquet")
 trans = load("views/ai_transmission.parquet")
@@ -345,8 +375,8 @@ if fin_in is not None and len(fin_in):
         cov_txt = "적자" if (lc != lc or lc < 0) else "%.1f배" % lc
         st.markdown(f"**{pick}**: 이 가정이면 5년간 **신규 조달 약 {tot:,.0f}억 달러**가 필요하고, 부채는 {row['debt']/1e8:,.0f}억 → {last.debt/1e8:,.0f}억, 이자는 {row['interest']/1e8:,.0f}억 → {last.interest/1e8:,.0f}억, "
                     f"이자보상은 {cov_txt}가 됩니다 (영업이익 연 {e_imp:+,}억 달러 가정).")
-        st.markdown('<p class="note">예측이 아니라 산식입니다. 기본값은 \"현재 속도 유지\"(영업이익 정체)라 보수적이며, 영업이익이 최근처럼 늘면(위 참고치를 슬라이더에 입력) 결과가 크게 달라집니다. '
-                    '미사용 신용한도·자산 매각·증자·고객 선급금은 반영하지 않았고, 조달 시장이 열려 있다는 전제입니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">예측이 아니라 산식입니다. 기본값은 \"현재 속도 유지\"(영업이익 정체)라 보수적이며, 영업이익이 최근처럼 늘면(위 참고치를 슬라이더에 입력) 결과가 크게 달라집니다. '
+                    '미사용 신용한도·자산 매각·증자·고객 선급금은 반영하지 않았고, 조달 시장이 열려 있다는 전제입니다.</p>')
     fin_sim()
 if trans is not None and len(trans):
     with st.expander("차입 의존 기업·신용시장의 스트레스는 AI 공급망을 앞서가나 (검증 결과: 아니오)"):
@@ -354,9 +384,9 @@ if trans is not None and len(trans):
         tt = trans.copy()
         st.dataframe(pd.DataFrame({"신호": tt.signal, "결과": tt.target, "표본": tt.n, "유효표본": tt.n_eff.round(0), "상관": tt["corr"].round(2), "t(겹침 보정)": tt.t.round(1),
                                    "전반": tt.corr_h1.round(2), "후반": tt.corr_h2.round(2)}), hide_index=True, width="stretch")
-        st.markdown(f'<p class="note">어떤 조합도 |t|가 2에 못 미쳐 <b>선행 관계는 확인되지 않았습니다(참고)</b>. 반면 같은 날 움직임은 꽤 같이 갑니다'
+        ui.note(f'<p class="note">어떤 조합도 |t|가 2에 못 미쳐 <b>선행 관계는 확인되지 않았습니다(참고)</b>. 반면 같은 날 움직임은 꽤 같이 갑니다'
                     f'(2025-04~ 일별 상관: CoreWeave–NVIDIA {cj.get("CRWV-NVIDIA", float("nan")):.2f}, Oracle–NVIDIA {cj.get("ORCL-NVIDIA", float("nan")):.2f}). '
-                    '즉 신용 스트레스가 공급망 약세를 미리 알려 주기보다, 같은 \"AI 트레이드\" 안에서 함께 움직입니다. CoreWeave 표본은 유효 14개뿐입니다.</p>', unsafe_allow_html=True)
+                    '즉 신용 스트레스가 공급망 약세를 미리 알려 주기보다, 같은 \"AI 트레이드\" 안에서 함께 움직입니다. CoreWeave 표본은 유효 14개뿐입니다.</p>')
 
 e1, e2 = st.columns(2, gap="large")
 with e1:
@@ -376,7 +406,7 @@ with e1:
         st.markdown(f"CAPEX/영업현금흐름 <b>{B.capex_ocf*100:.0f}% → {ratio*100:.0f}%</b>. "
                     + ("영업현금흐름보다 투자가 커져 부채·증자 의존이 늘어납니다." if ratio > 1 else
                        "영업현금흐름으로 감당 가능한 범위입니다." if ratio < 0.85 else "여유가 거의 없는 구간입니다."), unsafe_allow_html=True)
-        st.markdown('<p class="note">슬라이더 기본값은 최근 12개월의 실제 증가율입니다. 단순 곱셈이라 투자 시점 지연·감가상각·자사주 매입은 반영하지 않습니다.</p>', unsafe_allow_html=True)
+        ui.note('<p class="note">슬라이더 기본값은 최근 12개월의 실제 증가율입니다. 단순 곱셈이라 투자 시점 지연·감가상각·자사주 매입은 반영하지 않습니다.</p>')
     scenario()
 with e2:
     st.markdown(badge("선행 지표", "info") + "**대만 AI 공급망 월매출** (전년 동월 대비 %)", unsafe_allow_html=True)
@@ -386,8 +416,8 @@ with e2:
                                text=[f"{v:+.0f}%" for v in lm.yoy], textposition="outside"))
         fig.update_xaxes(range=[0, max(130, lm.yoy.max() * 1.15)])
         plot(fig, 300, legend=False)
-        st.markdown(f'<p class="note">{lm.month.max().strftime("%Y-%m")}월 기준. 하이퍼스케일러 투자가 공급사 매출로 가는 속도를 분기 공시보다 1~2개월 먼저 보여줍니다. '
-                    f'이력은 수집을 시작한 시점부터 쌓입니다. 다음 확인: 매월 10일경, 분기 공시는 10월 말.</p>', unsafe_allow_html=True)
+        ui.note(f'<p class="note">{lm.month.max().strftime("%Y-%m")}월 기준. 하이퍼스케일러 투자가 공급사 매출로 가는 속도를 분기 공시보다 1~2개월 먼저 보여줍니다. '
+                    f'이력은 수집을 시작한 시점부터 쌓입니다. 다음 확인: 매월 10일경, 분기 공시는 10월 말.</p>')
 
 gpu_p = load("results/ai_gpu_rental.parquet")
 gpu_l = load("results/ai_gpu_latest.parquet")
@@ -409,11 +439,10 @@ if gpu_p is not None and gpu_l is not None and len(gpu_l):
             sr = gp[f"{g}|OD"].dropna()
             fig.add_scatter(x=sr.index, y=sr / sr.iloc[0] * 100, name=g, mode="lines+markers", line=dict(color=col, width=2.4))
         plot(fig, 260)
-    st.markdown(
-        "<p class=\"note\">공급과잉은 세 가지로 나뉩니다. <b>① 생산 과잉</b>(만든 GPU를 안 사감) · <b>② 가동 과잉</b>(팔렸지만 데이터센터에서 놀고 있음) · "
+    ui.note("<p class=\"note\">공급과잉은 세 가지로 나뉩니다. <b>① 생산 과잉</b>(만든 GPU를 안 사감) · <b>② 가동 과잉</b>(팔렸지만 데이터센터에서 놀고 있음) · "
         "<b>③ 투자 과잉</b>(가동률은 높아도 AI 수익으로 투자비를 못 갚음). 임대가격은 ②를 가장 직접 보여주고, ③은 위 CAPEX·FCF·조달 신호가, ①은 HBM·GPU 주문(무료 데이터 없음)이 봅니다.<br>"
         "<b>한계</b>: 이 값은 공급업체가 <b>게시한 가격</b>이지 체결가가 아닙니다. 1년 약정 호가(약 5달러)는 실제 계약가(SemiAnalysis 조사 H100 1년 계약 2.35달러, 유료)와 큰 차이가 있어 수준이 아니라 <b>방향</b>만 봅니다. "
-        "공개 일별 이력이 2026-10-26부터라 35일이 쌓이기 전에는 F15를 판정하지 않으며(보류), 가동률·공급업체 차입 조건은 무료 데이터가 없습니다.</p>", unsafe_allow_html=True)
+        "공개 일별 이력이 2026-10-26부터라 35일이 쌓이기 전에는 F15를 판정하지 않으며(보류), 가동률·공급업체 차입 조건은 무료 데이터가 없습니다.</p>")
 
 with st.expander("경영진이 직접 공개한 AI 수치 (원문, 신뢰 등급 A)"):
     dd = disc.sort_values("filed", ascending=False).head(10)
