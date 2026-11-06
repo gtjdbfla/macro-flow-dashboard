@@ -422,7 +422,7 @@ with e2:
 gpu_p = load("results/ai_gpu_rental.parquet")
 gpu_l = load("results/ai_gpu_latest.parquet")
 if gpu_p is not None and gpu_l is not None and len(gpu_l):
-    ui.stage("공급", "GPU 임대가격은 공급과잉을 말하고 있나", "게시가격 기준 · 공급과잉 3가지를 구분")
+    ui.stage("현재", "GPU 임대가격은 공급과잉을 말하고 있나", "게시가격 기준 · 공급과잉 3가지를 구분")
     f15 = fl.get("F15")
     if f15:
         st.markdown(badge(f15["level"], level_kind(f15["level"])) + f"**F15 {f15['title']}** — {f15['text']}", unsafe_allow_html=True)
