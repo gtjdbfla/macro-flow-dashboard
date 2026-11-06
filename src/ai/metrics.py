@@ -133,7 +133,7 @@ def flags(co: dict, prices: dict) -> list:
         pct = float((h["opinc_per_capex"] < h["opinc_per_capex"].iloc[-1]).mean())
         f2 = pct < 1 / 3
         out.append({"id": "F2", "title": "투자 회수 속도(영업이익)", "on": f2, "level": "경고" if f2 else "정상",
-                    "text": f"1년 전 CAPEX 1달러당 영업이익 증가 {h['opinc_per_capex'].iloc[-1]:.2f}달러 — 자기 이력(2014~) 대비 하위 {pct*100:.0f}%"
+                    "text": f"회사 전체 영업이익 증가액 ÷ 1년 전 CAPEX {h['opinc_per_capex'].iloc[-1]:.2f}달러 — 자기 이력(2014~) 대비 하위 {pct*100:.0f}%"
                             + (" (하위 1/3: 회수 둔화)" if f2 else "")})
     lev = []
     for t in INFRA:

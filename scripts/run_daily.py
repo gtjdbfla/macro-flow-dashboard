@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("MACRO_DATA_DIR", ROOT / "data"))
 PARQ = DATA / "parquet"
 PY = sys.executable
-COLLECT = {"us": ["yahoo", "cftc", "fred", "ssga", "sec", "cloud", "debt"], "kr": ["kis", "kis_stocks"],
+COLLECT = {"us": ["yahoo", "cftc", "fred", "ssga", "sec", "cloud", "debt"], "kr": ["yahoo_kr", "kis", "kis_stocks"],
            "filings": ["sec", "cloud", "debt"], "weekly": ["french"]}
 FEATURES = ("build_features", ["scripts/build_features.py"], True, 900)
 BACKTESTS = ("run_backtests", ["scripts/run_backtests.py"], False, 900)
@@ -167,14 +167,14 @@ def main():
     # 2) 분석 단계 선택
     if mode == "filings":
         changed = filings_snapshot() != before
-        pipeline = [AI, SCORING, RISK, VIEWS] if changed else []
+        pipeline = [RISK, AI, SCORING, VIEWS] if changed else []
         steps.append({"name": "새 공시 확인", "ok": True, "seconds": 0, "tail": "새 공시 있음 -> 분석 갱신" if changed else "새 공시 없음"})
     elif mode == "weekly":
-        pipeline = [FEATURES, BACKTESTS, AI, SCORING, RISK, VIEWS]
+        pipeline = [RISK, FEATURES, BACKTESTS, AI, SCORING, VIEWS]
     else:
-        pipeline = [FEATURES, AI, SCORING, RISK, VIEWS]
+        pipeline = [RISK, FEATURES, AI, SCORING, VIEWS]
         if not (DATA / "results" / "regime_backtest.parquet").exists():
-            pipeline.insert(1, BACKTESTS)
+            pipeline.insert(2, BACKTESTS)
     for name, cmd, critical, tmo in pipeline:
         if halted:
             steps.append({"name": name, "ok": False, "seconds": 0, "tail": "이전 치명 단계 실패로 건너뜀"})

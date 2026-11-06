@@ -6,13 +6,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import ai_view
 import ui
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
 meta = load("views/meta.json")
 latest = load("results/ai_latest.parquet")
 hist = load("results/ai_history.parquet")
-cloud_h = load("results/ai_cloud_history.parquet")
+cloud_latest = load("results/ai_cloud_latest.parquet")
+slt = load("views/ai_safety_latest.parquet")
 agg = load("results/ai_cloud_agg.parquet")
 spreads = load("results/ai_credit_spreads.parquet")
 issu = load("results/ai_credit_issuance.parquet")
@@ -22,25 +24,14 @@ fobj = json.loads(open(ui.DATA_DIR / "results/ai_flags.json", encoding="utf-8").
 fl = {f["id"]: f for f in fobj["flags"]}
 B = latest[latest.ticker == "BIG4"].iloc[0]
 LT = latest.set_index("ticker")
-cl = agg.iloc[-1]
 
-st.title("② AI 수익성")
-_cl = agg.iloc[-1]
-ui.purpose("AI 기업의 수익성은 어떻게 변해 왔고, 지금 어떤 상태이며, 앞으로 무엇을 보면 될까?",
-           f"파는 쪽(클라우드 매출 <b>{pct(_cl.yoy*100)}</b>, 마진 {_cl.margin*100:.0f}%)은 좋아지고, 투자하는 쪽(Big4 CAPEX <b>{pct(B.capex_yoy*100)}</b> vs 매출 "
-           f"<b>{pct(B.rev_yoy*100)}</b>)은 회수·조달 부담이 커지고 있습니다. 공시 재무는 회사 전체 기준이라 AI만의 수치는 아니며, 주가를 예측하지 않습니다.",
-           [("과거", "투자·매출·이익·클라우드가 최근 3년 어떻게 변했나"),
-            ("현재", "투자 → 클라우드 수요 → 이익·현금 → 조달 네 단계 상태 · 회사별 표"),
-            ("다음", "예측이 아닌 두 도구: 가정 시나리오 · 대만 공급망 선행 지표")],
-           badge("현황판 · 예측 아님", "warn"))
+st.title("② AI 인프라 펀더멘털")
 ui.freshness(meta)
-
-_sig = {k: v["level"] for k, v in fl.items()}
-_bad = [f"{k} {fl[k]['title']}" for k in fl if level_kind(fl[k]["level"]) in ("bad", "warn")]
-_good = [k for k in fl if level_kind(fl[k]["level"]) == "good"]
-st.markdown(
-    '<div class="verdict"><b>한 줄 요약</b> — 수요(수주·공급사 매출·클라우드 성장)는 강하지만, 투자가 매출보다 빨라 회수와 현금창출이 약해지고 조달 부담이 커지는 쪽입니다.<br>'
-    f'<span class="muted">긍정 신호 {len(_good)}개 · 주의/경고 {len(_bad)}개: ' + (", ".join(_bad) if _bad else "없음") + "</span></div>", unsafe_allow_html=True)
+cash_msg = ("투자 후 남은 잉여현금흐름은 전년보다 줄었습니다."
+            if B.fcf_chg < 0 else "잉여현금흐름의 전년 대비 변화를 확인합니다.")
+st.markdown(f"**클라우드 매출과 마진, 투자 후 남는 현금, 자금조달 여력**을 함께 봅니다. "
+            f"Big4의 현금 CAPEX는 최근 12개월 전년 대비 {B.capex_yoy:+.0%}였습니다. {cash_msg}")
+ai_view.fundamentals(latest, cloud_latest, slt)
 
 _fp = load("views/ai_forecast.parquet")
 if _fp is not None:
@@ -101,7 +92,7 @@ steps = [
     ("1 투자", "투자(CAPEX)", "warn" if B.capex_yoy > 0.5 else "mid",
      f"Big4 12개월 CAPEX <b>{B.capex_ttm/1e8:,.0f}억 달러</b><br>전년 대비 <b>{pct(B.capex_yoy*100)}</b>"),
     ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8"]),
-     f"클라우드 3사 매출 <b>{pct(cl.yoy*100)}</b> · 마진 {cl.margin*100:.0f}%<br>대만 핵심 8사 중 <b>{n_tw}사</b> 월매출 +20%↑"),
+     f"위 회사별 공시 실적 참고<br>대만 핵심 8사 중 <b>{n_tw}사</b> 월매출 +20%↑"),
     ("3 이익·현금", "회수와 현금흐름", kind_of(["F1", "F2", "F14"]),
      f"매출 {pct(B.rev_yoy*100)} · 영업이익 {pct(B.opinc_yoy*100)}<br>FCF 전년 대비 <b>{B.fcf_chg/1e8:+,.0f}억 달러</b>"),
     ("4 조달", "자금 조달", kind_of(["F3", "F9", "F10", "F11", "F12"]),
@@ -122,12 +113,14 @@ with a:
         fig.add_scatter(x=b4.period_end, y=b4[c] * 100, name=n, mode="lines+markers", line=dict(color=col, width=2.4))
     plot(fig, 300)
 with b:
-    st.markdown("**클라우드는 가속하고 마진도 오른다** (AWS·Google Cloud·Microsoft IC 합계)")
+    st.markdown("**클라우드 3사 과거 합계** (AWS·Google Cloud·구 Microsoft Intelligent Cloud)")
     ca = agg.tail(10)
     fig = go.Figure()
     fig.add_bar(x=ca.quarter_end, y=ca.yoy * 100, name="매출 증가율(%)", marker_color="#5b8def", opacity=.8)
     fig.add_scatter(x=ca.quarter_end, y=ca.margin * 100, name="영업이익률(%)", mode="lines+markers", line=dict(color="#f59e0b", width=2.4))
     plot(fig, 300)
+    if len(ca):
+        st.caption(f"{ca.quarter_end.iloc[-1]:%Y-%m}까지 비교 가능한 3사 분기. Microsoft 부문 개편 이후 최신 수치는 상단에서 별도로 표시합니다.")
 
 c1, c2 = st.columns(2, gap="large")
 b4l = hist[hist.ticker == "BIG4"].sort_values("period_end")
@@ -141,18 +134,18 @@ with c1:
     plot(fig, 280)
     ui.note("두 선 사이 붉은 영역이 CAPEX가 영업현금흐름을 넘는 구간(잉여현금흐름 적자)입니다. 아직 CAPEX가 아래에 있으면 번 돈 안에서 투자하고 있다는 뜻입니다.")
 with c2:
-    st.markdown("**투자 1달러가 늘린 영업이익** (Big4, 달러)")
+    st.markdown("**영업이익 증가액 ÷ 1년 전 CAPEX** (Big4, 회사 전체)")
     fig = go.Figure()
     _r = hist[hist.ticker == "BIG4"].dropna(subset=["opinc_per_capex"]).sort_values("period_end")
-    fig.add_scatter(x=_r.period_end, y=_r.opinc_per_capex, name="투자회수", mode="lines", line=dict(color="#5b8def", width=2.6))
+    fig.add_scatter(x=_r.period_end, y=_r.opinc_per_capex, name="이익 증가액 ÷ 이전 CAPEX", mode="lines", line=dict(color="#5b8def", width=2.6))
     fig.add_hline(y=float(_r.opinc_per_capex.quantile(1 / 3)), line_dash="dot", line_color="#ee5555", annotation_text="자기 이력 하위 1/3 (F2 경고선)", annotation_position="bottom right")
     plot(fig, 280, legend=False)
-    ui.note("1년 전 CAPEX 1달러가 이후 1년간 늘린 영업이익입니다. 점선 아래면 과거 평균보다 투자 효율이 낮은 구간입니다.")
+    ui.note("회사 전체 영업이익의 전년 대비 증가액을 1년 전 12개월 CAPEX로 나눈 값입니다. AI 투자로 발생한 이익을 분리할 수 없어, 점선은 이 비율의 과거 하위 3분위 경계로만 읽습니다.")
 
 # ── 현재 ────────────────────────────────────────────────────────────────────
 ui.stage("현재", "지금 네 단계는 어떤 상태인가", "투자 → 수요 → 이익·현금 → 조달")
 st.markdown(html, unsafe_allow_html=True)
-ui.note('<p class="note">상태 판정은 사전에 고정한 규칙의 신호 10개를 단계별로 묶은 것입니다(근거·방법 페이지). 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>')
+ui.note('<p class="note">상태 판정은 근거·방법 페이지의 규칙 중 각 단계에 관련된 항목을 묶었습니다. 종합 점수는 가중치를 검증할 표본이 없어 만들지 않았습니다.</p>')
 c, d = st.columns([1.25, 1], gap="large")
 with c:
     st.markdown("**회사별 현황**")
@@ -182,7 +175,6 @@ with d:
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
-slt = load("views/ai_safety_latest.parquet")
 if slt is not None:
     srcc = load("views/ai_roic_company.parquet")
     sm = load("views/ai_merton_history.parquet")
@@ -193,7 +185,7 @@ if slt is not None:
     ui.note('<p class="note">억 달러. <b>CDS 시세는 무료 데이터가 없어</b> 공시(부채·리스·현금·이자)와 가격으로 대신 계산합니다. '
                 '<b>유동성 런웨이</b> = 현금 ÷ (FCF 적자 + 12개월 내 원금 만기): 신규 조달 없이 버틸 수 있는 기간(미사용 한도·계약 자금 미반영). '
                 '<b>RPO ÷ 부채</b>: 계약 매출잔고가 부채+리스의 몇 배인가(고객 신용도는 반영 안 됨). '
-                '<b>증분 ROIC</b> = 2022년 대비 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX(낙관적 계산).</p>')
+                '<b>세후 영업이익 증가 ÷ 추가 CAPEX</b>는 2022년 대비 회사 전체 변화의 비율입니다.</p>')
     g1, g2 = st.columns(2, gap="large")
     with g1:
         st.markdown("**주가로 추정한 신용 스트레스** (Merton 5년 내재 스프레드, bp · CDS 아님)")
@@ -295,18 +287,18 @@ if slt is not None:
                         '그래서 이 지표는 <b>참고</b> 등급이며, 같은 회사의 추세 변화만 봅니다.</p>')
 
 # ── 다음 ────────────────────────────────────────────────────────────────────
-ui.stage("다음", "앞으로 — 다음 12개월 기준선 전망과 두 가지 도구")
+ui.stage("다음", "향후 12개월 가정별 시나리오와 점검 지표")
 fp = load("views/ai_forecast.parquet")
 fe = load("views/ai_forecast_eval.parquet")
 fn = load("views/ai_forecast_negatives.parquet")
 if fp is not None:
     P = fp.set_index("metric")
     _e = pd.Timestamp(P.loc["capex"].last_q_end)
-    st.markdown(badge("기준선 전망", "info") + badge("단서", "warn") + f"**Big4 다음 12개월 ({(_e + pd.offsets.MonthBegin(1)):%Y-%m} ~ {(_e + pd.DateOffset(months=12)):%Y-%m})**", unsafe_allow_html=True)
+    st.markdown(badge("최근 증가율 지속 가정", "info") + badge("단서", "warn") + f"**Big4 다음 12개월 ({(_e + pd.offsets.MonthBegin(1)):%Y-%m} ~ {(_e + pd.DateOffset(months=12)):%Y-%m})**", unsafe_allow_html=True)
     fc = P.loc["fcf"]
     ui.explain(f'<p class="lede">지금 증가율이 그대로 이어지면 다음 12개월에 Big4는 <b>CAPEX {P.loc["capex"].proj/1e8:,.0f}억 달러(+{P.loc["capex"].growth*100:.0f}%)</b>, '
                 f'매출 {P.loc["revenue"].proj/1e8:,.0f}억(+{P.loc["revenue"].growth*100:.0f}%), 영업현금흐름 {P.loc["ocf"].proj/1e8:,.0f}억(+{P.loc["ocf"].growth*100:.0f}%)입니다. '
-                f'그러면 <b>잉여현금흐름은 {fc.now_ttm/1e8:,.0f}억 → 약 {fc.proj/1e8:,.0f}억 달러</b>(범위 {fc.lo/1e8:,.0f} ~ {fc.hi/1e8:,.0f})로 0 부근까지 줄어듭니다. '
+                f'그러면 <b>잉여현금흐름은 {fc.now_ttm/1e8:,.0f}억 → 약 {fc.proj/1e8:,.0f}억 달러</b>(범위 {fc.lo/1e8:,.0f} ~ {fc.hi/1e8:,.0f})로 계산됩니다. '
                 f'가장 최근 분기({_e:%Y-%m})만 보면 이미 영업현금흐름 {P.loc["ocf"].last_q/1e8:,.0f}억 − CAPEX {P.loc["capex"].last_q/1e8:,.0f}억 = 약 {fc.last_q/1e8:,.0f}억 달러입니다.</p>', "ⓘ 전망 해설")
     f1, f2 = st.columns([1.25, 1], gap="large")
     with f1:
@@ -326,7 +318,7 @@ if fp is not None:
                             error_y=dict(type="data", symmetric=False, visible=True, array=[0, (P.loc[k].hi - P.loc[k].proj) / 1e8], arrayminus=[0, (P.loc[k].proj - P.loc[k].lo) / 1e8]))
         fig.add_vline(x=_e, line_dash="dot", line_color="rgba(138,153,163,.6)")
         plot(fig, 300)
-        ui.note("실선은 공시된 12개월 합, 점선은 기준선 전망(오차 범위 막대)입니다. 세로 점선이 마지막 공시 분기입니다.")
+        ui.note("실선은 공시된 12개월 합, 점선은 최근 증가율 지속 가정(과거 오차 범위 막대)입니다. 세로 점선이 마지막 공시 분기입니다.")
     if fn is not None:
         with st.expander("더 정교한 예측 변수는 기준선을 넘지 못했습니다 (수주잔고·NVIDIA 매출·평균회귀 모델)"):
             st.dataframe(pd.DataFrame({"검정": fn.test, "표본": fn.n, "결과": fn.result, "판정": fn.verdict, "이유": fn.why}), hide_index=True, width="stretch")
@@ -447,7 +439,7 @@ if gpu_p is not None and gpu_l is not None and len(gpu_l):
 with st.expander("경영진이 직접 공개한 AI 수치 (원문, 신뢰 등급 A)"):
     dd = disc.sort_values("filed", ascending=False).head(10)
     st.dataframe(pd.DataFrame({"회사": dd.ticker, "분기": dd.quarter_end.dt.strftime("%Y-%m"), "원문": dd.text}), hide_index=True, width="stretch")
-with st.expander("신호 10개의 규칙과 현재 판정"):
+with st.expander("신호 규칙과 현재 판정"):
     for i in sorted(fl, key=lambda x: int(x[1:])):
         f = fl[i]
         st.markdown(badge(f["level"], level_kind(f["level"])) + f"**{i} {f['title']}** — {f['text']}", unsafe_allow_html=True)

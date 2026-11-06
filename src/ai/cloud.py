@@ -21,8 +21,10 @@ def history() -> pd.DataFrame:
 
 def aggregate(h: pd.DataFrame) -> pd.DataFrame:
     """3사 합계(세 회사 값이 모두 있는 분기)."""
-    p = h.pivot_table(index="quarter_end", columns="ticker", values=["cloud_rev", "cloud_rev_prior", "cloud_opinc", "cloud_opinc_prior"])
-    p = p.dropna()
+    metrics = ["cloud_rev", "cloud_rev_prior", "cloud_opinc", "cloud_opinc_prior"]
+    p = h.pivot_table(index="quarter_end", columns="ticker", values=metrics)
+    columns = pd.MultiIndex.from_product([metrics, NAMES])
+    p = p.reindex(columns=columns).dropna()
     out = pd.DataFrame(index=p.index)
     out["rev"] = p["cloud_rev"].sum(axis=1)
     out["rev_prior"] = p["cloud_rev_prior"].sum(axis=1)
@@ -54,20 +56,28 @@ def latest(h: pd.DataFrame, co: dict) -> pd.DataFrame:
 def flags(h: pd.DataFrame, tw: pd.DataFrame | None) -> list:
     """F7 클라우드 성장·마진, F8 대만 AI 공급망 월매출. 임계값은 docs/AI_PROFITABILITY.md에 사전 고정."""
     out = []
-    last = h.groupby("ticker").tail(1)
-    acc = int((last.yoy_chg_pp > 0).sum())
-    mar = int((last.margin_chg_pp > 0).sum())
-    if acc >= 2 and mar >= 2:
+    last = h.sort_values("quarter_end").groupby("ticker").tail(1)
+    current = last[last.quarter_end == last.quarter_end.max()]
+    complete = current.dropna(subset=["yoy", "yoy_chg_pp", "margin", "margin_chg_pp"])
+    acc = int((complete.yoy_chg_pp > 0).sum())
+    mar = int((complete.margin_chg_pp > 0).sum())
+    if len(complete) < 2:
+        lvl = "보류"
+    elif acc >= 2 and mar >= 2:
         lvl = "긍정"
     elif acc >= 2:
         lvl = "중립"
     else:
         lvl = "둔화"
-    txt = ", ".join("%s 성장 %+.0f%%(직전 대비 %+.0fpp)·마진 %.0f%%(전년 대비 %+.0fpp)" % (
-        {"MSFT": "Azure계(IC)", "GOOGL": "Google Cloud", "AMZN": "AWS"}[r.ticker], r.yoy * 100, r.yoy_chg_pp, r.margin * 100, r.margin_chg_pp)
-        for r in last.itertuples())
+    txt = [f"{NAMES[r.ticker]} {r.quarter_end:%Y-%m} 성장 {r.yoy:+.0%} · 마진 {r.margin:.0%}"
+           for r in complete.itertuples()]
+    azure = last.loc[last.ticker == "MSFT"].dropna(subset=["azure_yoy"]) if "azure_yoy" in last else last.iloc[:0]
+    if len(azure):
+        r = azure.iloc[0]
+        txt.append(f"Azure {r.quarter_end:%Y-%m} 매출 {r.azure_yoy:+.0%}(부문 마진 비교와 별도)")
+    summary = f"비교 가능한 {len(complete)}곳 중 {acc}곳 성장 가속, {mar}곳 마진 개선"
     out.append({"id": "F7", "title": "클라우드 매출 가속·수익성", "on": lvl == "긍정", "level": lvl,
-                "text": txt + " — 3사 중 %d곳 성장 가속, %d곳 마진 개선." % (acc, mar)})
+                "text": " · ".join([summary, *txt])})
     if tw is not None and len(tw):
         core = ["2330", "2317", "2382", "6669", "3231", "2356", "2376", "2345"]
         m = tw[tw.ticker.isin(core)].sort_values("month").groupby("ticker").tail(1)

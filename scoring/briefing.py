@@ -96,7 +96,7 @@ def build(summary: dict) -> list:
         b4 = pd.read_parquet(ai_t).query("ticker == 'BIG4'").iloc[0]
         flags_ai = {f["id"]: f for f in json.loads(ai_p.read_text(encoding="utf-8"))["flags"]}
         cl = pd.read_parquet(R / "ai_cloud_agg.parquet").iloc[-1] if (R / "ai_cloud_agg.parquet").exists() else None
-        demand = ("클라우드 3사 합계 매출 %+.0f%%(영업이익률 %.0f%%, 전년 %.0f%%), " % (cl.yoy * 100, cl.margin * 100, cl.margin_prior * 100)
+        demand = ("비교 가능한 3사 마지막 분기(%s) 매출 %+.0f%%(영업이익률 %.0f%%, 전년 %.0f%%), " % (pd.Timestamp(cl.quarter_end).strftime("%Y-%m"), cl.yoy * 100, cl.margin * 100, cl.margin_prior * 100)
                   if cl is not None else "") + ("수요 측 신호 " + ", ".join(flags_ai[i]["title"] + " " + flags_ai[i]["level"] for i in ("F4", "F6", "F8") if i in flags_ai) + ".")
         credit_txt = " ".join(flags_ai[i]["title"] + " " + flags_ai[i]["level"] + "." for i in ("F9", "F10") if i in flags_ai)
         warn = [f["title"] for f in flags_ai.values() if f["level"] in ("경고", "주의")]

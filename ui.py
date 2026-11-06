@@ -38,6 +38,10 @@ h3{font-size:1.2rem!important;margin:1.2rem 0 .5rem!important}
 .kpi .l{font-size:.8rem;color:#8a99a3}
 .kpi .v{font-size:1.5rem;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi .s{font-size:.82rem;color:#8a99a3}
+.macro-factors.kpis{grid-template-columns:repeat(5,minmax(0,1fr));margin:.65rem 0}
+.macro-factors .b{margin-top:.35rem}
+@media(max-width:1100px){.macro-factors.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.macro-factors.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* 근거 카드(등급 배지 + 한 줄 결론 + 큰 숫자 + 구간별 줄 + 칩) */
 .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:.4rem 0 1rem}
 .ev{border:1px solid #64748b44;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -339,7 +343,7 @@ def safety_table(lt, rc):
                     f"<td class='r'>{rd}</td><td class='r'>{roic}</td></tr>")
     return ("<table class='mini'><tr><th>회사</th><th class='r'>총부채 (+리스)</th><th class='r'>현금·단기투자</th><th class='r'>순부채(리스 포함)</th>"
             "<th class='r'>순부채 ÷ 영업현금흐름</th><th class='r'>이자보상 (영업이익÷이자)</th><th class='r'>12개월 내 만기</th><th class='r'>FCF (12개월)</th>"
-            "<th class='r'>런웨이 (12개월 실적)</th><th class='r'>런웨이 (최근 분기 속도)</th><th class='r'>RPO ÷ 부채</th><th class='r'>증분 ROIC</th></tr>" + "".join(rows) + "</table>")
+            "<th class='r'>현금만 (12개월 실적)</th><th class='r'>현금만 (최근 분기 속도)</th><th class='r'>RPO ÷ 부채</th><th class='r'>세후 이익 증가 ÷ 추가 CAPEX</th></tr>" + "".join(rows) + "</table>")
 
 
 def valuation_table(v):

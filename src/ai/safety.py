@@ -454,7 +454,7 @@ def flags(lt: pd.DataFrame, mh: pd.DataFrame, ro: pd.DataFrame, rc: pd.DataFrame
         txt = ", ".join(f"{NAMES[t]} {v*100:.0f}%" for t, v in bad.items())
         if big is not None:
             txt += f" · Big4 합산 {big.roic*100:.0f}%"
-        out.append({"id": "F14", "level": lvl, "title": "증분 ROIC (2022년 대비 늘린 CAPEX의 수익)", "text": txt + f" — 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX. 자본비용 가정 {HURDLE*100:.0f}% 미만이면 주의. 영업이익 증가 전부를 이 투자의 성과로 보는 낙관적 계산이고, 투자 직후에는 수익이 아직 안 나와 낮게 나옵니다."})
+        out.append({"id": "F14", "level": lvl, "title": "추가 CAPEX 대비 회사 전체 이익 변화", "text": txt + f" — 세후 영업이익 증가 ÷ 2022년보다 더 쓴 누적 CAPEX. 자본비용 가정 {HURDLE*100:.0f}% 미만이면 주의. 영업이익 증가 전부를 이 투자의 성과로 보는 낙관적 계산이고, 투자 직후에는 수익이 아직 안 나와 낮게 나옵니다."})
     return out
 
 

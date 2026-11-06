@@ -15,6 +15,8 @@ now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 if not only or "yahoo" in only:
     cov["yahoo"] = {"updated": now, "series": yahoo.collect(YAHOO)}
+if "yahoo_kr" in only:
+    cov["yahoo_kr"] = {"updated": now, "series": yahoo.collect(["^KS11"])}
 if not only or "cftc" in only:
     try:
         cov["cftc"] = {"updated": now, "series": cftc.collect(CFTC)}

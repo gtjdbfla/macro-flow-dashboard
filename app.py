@@ -10,7 +10,7 @@ ui.css()
 pages = [
     st.Page("views/home.py", title="홈", default=True),
     st.Page("views/flows.py", title="① 월가 자금"),
-    st.Page("views/ai.py", title="② AI 수익성"),
+    st.Page("views/ai.py", title="② AI 인프라"),
     st.Page("views/updates.py", title="갱신 현황"),
     st.Page("views/evidence.py", title="근거·방법"),
 ]

@@ -11,6 +11,7 @@ import bisect
 import numpy as np
 import pandas as pd
 
+from scoring import macro_outlook
 from src.data import PARQUET
 from src.data.yahoo import _fname
 
@@ -25,8 +26,10 @@ SHOCK_RET5, SHOCK_VIX5 = -0.05, 0.60   # 충격 표지(사전 고정): S&P 5일 
 
 def _px(sym: str) -> pd.Series:
     f = PARQUET / _fname(sym)
-    s = pd.read_parquet(f)["close"].dropna() if f.exists() else pd.Series(dtype=float)
-    return s[~s.index.duplicated(keep="last")]
+    if not f.exists():
+        return pd.Series(dtype=float, index=pd.DatetimeIndex([]))
+    s = pd.read_parquet(f)["close"].dropna()
+    return s[~s.index.duplicated(keep="last")].sort_index()
 
 
 def exprank(s: pd.Series, minn: int = 1260) -> pd.Series:
@@ -47,10 +50,8 @@ def level_of(x: float) -> str:
     return [n for lo, n in LEVELS if x >= lo][-1]
 
 
-def features() -> pd.DataFrame:
-    P = _px("^GSPC")
-    P = P[P.index >= START]
-    dxy = _px("DX-Y.NYB").reindex(P.index).ffill()
+def features(P: pd.Series, dollar: pd.Series) -> pd.DataFrame:
+    dxy = dollar.reindex(P.index).ffill()
     r = np.log(P).diff()
     F = pd.DataFrame(index=P.index)
     F["below_200dma"] = -np.log(P / P.rolling(200).mean())
@@ -68,11 +69,13 @@ def _fwd(P: pd.Series, h: int):
 
 
 def run():
-    F = features()
-    P = _px("^GSPC").reindex(F.index)
+    P = _px("^GSPC").loc[START:]
+    dollar = _px("DX-Y.NYB").reindex(P.index)
+    F = features(P, dollar)
     R = pd.DataFrame({c: exprank(F[c]) for c in F.columns})
     S = R.mean(axis=1, skipna=True).where(R.notna().any(axis=1))
-    vix = _px("^VIX").reindex(F.index).ffill()
+    vix_observed = _px("^VIX").reindex(F.index)
+    vix = vix_observed.ffill()
     hist = pd.DataFrame({"score": S, "spx": P, "vix": vix}).dropna(subset=["score"])
     hist["level"] = hist.score.map(level_of)
     dd6, ret6 = _fwd(P, H)
@@ -85,7 +88,17 @@ def run():
     # 충격 표지: 최근 발동 여부와 과거 발동 뒤 6개월
     ret5 = P / P.shift(5) - 1
     vix5 = vix / vix.shift(5) - 1
-    shock = ((ret5 <= SHOCK_RET5) | (vix5 >= SHOCK_VIX5)).fillna(False)
+    spx_hit = ret5 <= SHOCK_RET5
+    vix5 = vix5.where(vix_observed.notna() & vix_observed.shift(5).notna())
+    vix_hit = vix5 >= SHOCK_VIX5
+    shock = spx_hit | vix_hit
+    recent_hits = shock.tail(5).loc[lambda s: s].index
+    trigger = None
+    if len(recent_hits):
+        day = recent_hits[-1]
+        trigger = {"as_of": str(day.date()),
+                   "spx_5d": float(ret5.loc[day]) if spx_hit.loc[day] else None,
+                   "vix_5d": float(vix5.loc[day]) if vix_hit.loc[day] else None}
     ev = shock[shock & ~shock.shift(1, fill_value=False)]
     ev = ev[~ev.index.to_series().diff().dt.days.lt(21).fillna(False)]   # 21일 안 재발동은 한 사건
     sh = pd.DataFrame({"dd": dd6.reindex(ev.index), "ret": ret6.reindex(ev.index)}).dropna()
@@ -112,12 +125,23 @@ def run():
     kb = next((n for (lo, hi), n in zip(edges, names) if lo < kc <= hi), None) if kc == kc else None
 
     last = hist.index[-1]
-    now = {"as_of": str(last.date()), "score": float(hist.score.iloc[-1]), "level": hist.level.iloc[-1],
-           "parts": {PARTS[c]: (None if np.isnan(R[c].iloc[-1]) else float(R[c].iloc[-1])) for c in PARTS},
-           "spx": float(P.dropna().iloc[-1]), "spx_dd": float(P.iloc[-1] / P.tail(252).max() - 1), "vix": float(vix.dropna().iloc[-1]),
-           "ret5": float(ret5.iloc[-1]), "vix5": float(vix5.iloc[-1]),
-           "shock": bool(shock.iloc[-1] or shock.tail(5).any()), "shock_stats": sh_stats,
+    level = hist.level.iloc[-1]
+    parts = {PARTS[c]: (float(R.at[last, c]) if pd.notna(R.at[last, c]) else None) for c in PARTS}
+    market_ready = (all(value is not None for value in parts.values())
+                    and pd.notna(dollar.at[last]) and pd.notna(vix_observed.at[last])
+                    and pd.notna(vix5.at[last]))
+    now = {"as_of": str(last.date()), "score": float(hist.score.iloc[-1]), "level": level,
+           "parts": parts, "market_ready": bool(market_ready),
+           "dollar_as_of": str(dollar.last_valid_index().date()) if dollar.notna().any() else None,
+           "vix_as_of": str(vix_observed.last_valid_index().date()) if vix_observed.notna().any() else None,
+           "spx": float(P.at[last]), "spx_dd": float(P.at[last] / P.loc[:last].tail(252).max() - 1),
+           "vix": float(vix.at[last]) if pd.notna(vix.at[last]) else None,
+           "ret5": float(ret5.at[last]) if pd.notna(ret5.at[last]) else None,
+           "vix5": float(vix5.at[last]) if pd.notna(vix5.at[last]) else None,
+           "shock": trigger is not None, "shock_trigger": trigger, "shock_stats": sh_stats,
+           "kospi_as_of": str(K.index[-1].date()) if len(K) else None,
            "kospi_dd": None if kc != kc else kc, "kospi_bucket": kb, "kospi_level": float(K.iloc[-1]) if len(K) else None,
            "kospi_prev_close": float(K.iloc[-2]) if len(K) > 1 else None,
-           "prevalence": float(T.bad.mean())}
+           "prevalence": float(T.bad.mean()) if len(T) else None,
+           "macro": macro_outlook.snapshot(last, level, trigger is not None, market_ready)}
     return hist, by, pd.DataFrame(krows), now

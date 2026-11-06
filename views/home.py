@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+import ai_view
 import risk_view
 import ui
 from ui import badge, callout, chips, duo, ev_card, kpis, level_kind, load, pct, plot, split_rows, summary_card, trio
@@ -32,10 +33,10 @@ flags = json.loads(open(ui.DATA_DIR / "results/ai_flags.json", encoding="utf-8")
 # ── 머리말 ───────────────────────────────────────────────────────────────────
 st.title("Macro & Capital Flow")
 try:
-    risk_view.render()
+    risk_view.render(meta)
 except Exception as _e:  # 새 카드의 오류가 홈 전체를 막지 않게 한다
-    st.caption(f"위험 온도계를 표시하지 못했습니다: {type(_e).__name__}")
-st.markdown('<p class="lede">두 가지 질문에 <b>과거 → 현재 → 다음</b> 순서로 답합니다. '
+    st.caption(f"주식 투자 환경을 표시하지 못했습니다: {type(_e).__name__}")
+st.markdown('<p class="lede">투자 환경을 본 뒤, 두 가지 주제를 <b>과거 → 현재 → 다음</b> 순서로 살펴봅니다. '
             '① 월가의 돈은 어디에서 어디로 움직였고 지금 어디에 있나 · ② AI 기업의 수익성은 어떻게 변해 왔고 지금 어떤 상태인가. '
             '앞날을 맞히는 도구가 아니라, 확인된 것과 아직 확인되지 않은 것을 구분해 보여주는 현황판입니다.</p>', unsafe_allow_html=True)
 ui.legend()
@@ -59,7 +60,8 @@ z = float(last.pred_foreign_z)
 zdir = "순매수 쪽" if z > 0.15 else ("순매도 쪽" if z < -0.15 else "중립")
 
 B = latest[latest.ticker == "BIG4"].iloc[0]
-cl = agg.iloc[-1]
+cloud_latest = load("results/ai_cloud_latest.parquet")
+cloud_tiles = ai_view.demand_tiles(cloud_latest)
 fl = {f["id"]: f for f in flags}
 demand = [i for i in ("F4", "F6", "F7", "F8") if i in fl]
 press = [i for i in ("F1", "F2", "F3", "F9", "F10", "F11", "F12", "F13", "F14") if i in fl]
@@ -79,16 +81,17 @@ slt_ = load("views/ai_safety_latest.parquet")
 extra = ""
 if slt_ is not None:
     _b = slt_.set_index("ticker")
-    extra = (f" 빚 쪽은 <b>Oracle 런웨이 {_b.loc['ORCL','runway_y']:.1f}년, CoreWeave {_b.loc['CRWV','runway_y']:.1f}년</b>"
+    extra = (f" 빚 쪽은 <b>Oracle 현금 기준 런웨이 {_b.loc['ORCL','runway_y']:.1f}년, CoreWeave {_b.loc['CRWV','runway_y']:.1f}년</b>"
              f"(현금 ÷ FCF 적자·12개월 만기)이라 신규 조달이 필요한 구조입니다.")
-head2 = f"{verdict}{extra} 수요 신호 {n_good}/{len(demand)}개 긍정, 회수·조달 신호 {n_bad}/{len(press)}개 경고·주의."
+cloud_text = " · ".join(f"{name} {growth} ({detail.split(' 분기')[0]})" for name, growth, detail in cloud_tiles)
+head2 = f"{verdict}{extra}" + (f" 최신 매출 전년비 <b>{cloud_text}</b>." if cloud_text else "")
 c1 = summary_card("① 월가의 자금은 어디에 있나", badge("한국 전달만 검증됨", "info") + badge("섹터 이동은 약한 단서", "warn"), head1,
                   [("순유입 1위 (20일)", top["name"], f"순자산의 {top.flow_1m*100:+.1f}% · {top.flow_20d_usd/1e8:+,.0f}억 달러"),
                    ("가장 많이 빠진 곳", bot_usd["name"], f"{bot_usd.flow_20d_usd/1e8:+,.0f}억 달러 · 순자산의 {bot_usd.flow_1m*100:+.1f}%"),
                    ("한국 다음 장 외국인", f"{z:+.2f}", zdir)])
-c2 = summary_card("② AI 수익성은 어떻게 변하고 있나", badge("현황판 · 예측 아님", "warn"), head2,
+c2 = summary_card("② AI 인프라 펀더멘털", badge("현황판 · 예측 아님", "warn"), head2,
                   [("투자 vs 매출 증가", f"{pct(B.capex_yoy*100)} / {pct(B.rev_yoy*100)}", "Big4 CAPEX / 매출, 12개월"),
-                   ("클라우드 3사", f"{pct(cl.yoy*100)}", f"매출 증가 · 영업이익률 {cl.margin*100:.0f}% (1년 전 {cl.margin_prior*100:.0f}%)"),
+                   ("CAPEX / 영업현금흐름", f"{B.capex_ocf:.0%}", "Big4 회사 전체 · 최근 12개월"),
                    ("잉여현금흐름", f"{B.fcf_ttm/1e8:,.0f}억 달러", f"전년 대비 {B.fcf_chg/1e8:+,.0f}억 달러")])
 duo(c1, c2)
 
@@ -183,12 +186,14 @@ def ai_detail():
             fig.add_scatter(x=b4h.period_end, y=b4h[c] * 100, name=n, mode="lines+markers", line=dict(color=col, width=2.4))
         plot(fig, 300)
     with p2:
-        st.markdown("**클라우드 매출은 가속하고 마진도 오른다** (3사 합계)")
+        st.markdown("**클라우드 3사 과거 합계** (구 Microsoft Intelligent Cloud 포함)")
         ca = agg.tail(10)
         fig = go.Figure()
         fig.add_bar(x=ca.quarter_end, y=ca.yoy * 100, name="매출 증가율(%)", marker_color="#5b8def", opacity=.8)
         fig.add_scatter(x=ca.quarter_end, y=ca.margin * 100, name="영업이익률(%)", mode="lines+markers", line=dict(color="#f59e0b", width=2.4))
         plot(fig, 300)
+        if len(ca):
+            st.caption(f"{ca.quarter_end.iloc[-1]:%Y-%m}까지 비교 가능한 3사 분기.")
 
     ui.stage("현재", "누가 얼마를 투자하고, 얼마나 벌어들이나", "회사별 12개월 CAPEX와 변화")
     t = ha.copy()
@@ -250,7 +255,8 @@ def ai_detail():
     if tw is not None and len(tw):
         tsmc = tw[tw.ticker == "2330"].sort_values("month").iloc[-1]
         tiles.append(("TSMC 월매출", pct(tsmc.yoy), f"{tsmc.month.strftime('%Y-%m')}, 전년 동월 대비"))
-    tiles.append(("클라우드 3사 매출", pct(cl.yoy * 100), "최근 분기, 전년 동기 대비"))
+    if cloud_tiles:
+        tiles.append(cloud_tiles[0])
     st.markdown(kpis(tiles), unsafe_allow_html=True)
     ui.stage("다음", "다음 12개월 기준선 전망과 지켜볼 것", "지금 증가율이 이어진다는 단순 가정 · 가정 시나리오는 ② AI 수익성 페이지")
     fp = load("views/ai_forecast.parquet")
@@ -258,7 +264,7 @@ def ai_detail():
         st.markdown(ui.forecast_table(fp), unsafe_allow_html=True)
         f_ = fp.set_index("metric").loc["fcf"]
         ui.note(f'<p class="note">최근 분기 전년동기비 증가율이 최근 4분기 합계에 이어진다는 방법(과거 오차를 범위로 사용). <b>잉여현금흐름은 {f_.now_ttm/1e8:,.0f}억 → 약 {f_.proj/1e8:,.0f}억 달러</b>로 '
-                    '0 부근까지 줄어드는 쪽이며, CAPEX는 최근 실제가 전망보다 컸습니다(위쪽 위험). 근거 등급은 단서입니다.</p>')
+                    '계산됩니다. 최근 분기 증가율이 이어진다는 가정입니다.</p>')
     a, b = st.columns(2, gap="large")
     with a:
         st.markdown("**지금 경고·주의 신호**")
