@@ -30,6 +30,7 @@ FEATURES = ("build_features", ["scripts/build_features.py"], True, 900)
 BACKTESTS = ("run_backtests", ["scripts/run_backtests.py"], False, 900)
 AI = ("run_ai", ["scripts/run_ai.py"], False, 600)
 SCORING = ("run_scoring", ["scripts/run_scoring.py"], True, 900)
+RISK = ("run_risk", ["scripts/run_risk.py"], False, 300)
 VIEWS = ("build_views", ["scripts/build_views.py"], True, 300)
 
 
@@ -166,12 +167,12 @@ def main():
     # 2) 분석 단계 선택
     if mode == "filings":
         changed = filings_snapshot() != before
-        pipeline = [AI, SCORING, VIEWS] if changed else []
+        pipeline = [AI, SCORING, RISK, VIEWS] if changed else []
         steps.append({"name": "새 공시 확인", "ok": True, "seconds": 0, "tail": "새 공시 있음 -> 분석 갱신" if changed else "새 공시 없음"})
     elif mode == "weekly":
-        pipeline = [FEATURES, BACKTESTS, AI, SCORING, VIEWS]
+        pipeline = [FEATURES, BACKTESTS, AI, SCORING, RISK, VIEWS]
     else:
-        pipeline = [FEATURES, AI, SCORING, VIEWS]
+        pipeline = [FEATURES, AI, SCORING, RISK, VIEWS]
         if not (DATA / "results" / "regime_backtest.parquet").exists():
             pipeline.insert(1, BACKTESTS)
     for name, cmd, critical, tmo in pipeline:

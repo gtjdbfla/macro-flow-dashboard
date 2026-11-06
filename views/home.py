@@ -8,10 +8,11 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+import risk_view
 import ui
 from ui import badge, callout, chips, duo, ev_card, kpis, level_kind, load, pct, plot, split_rows, summary_card, trio
 
-meta, state = load("views/meta.json"), load("views/state.json")
+meta = load("views/meta.json")
 sec = load("results/sector_snapshot.parquet")
 kh = load("views/korea_model_recent.parquet")
 quint = load("views/korea_quintile.parquet")
@@ -30,6 +31,10 @@ flags = json.loads(open(ui.DATA_DIR / "results/ai_flags.json", encoding="utf-8")
 
 # ── 머리말 ───────────────────────────────────────────────────────────────────
 st.title("Macro & Capital Flow")
+try:
+    risk_view.render()
+except Exception as _e:  # 새 카드의 오류가 홈 전체를 막지 않게 한다
+    st.caption(f"위험 온도계를 표시하지 못했습니다: {type(_e).__name__}")
 st.markdown('<p class="lede">두 가지 질문에 <b>과거 → 현재 → 다음</b> 순서로 답합니다. '
             '① 월가의 돈은 어디에서 어디로 움직였고 지금 어디에 있나 · ② AI 기업의 수익성은 어떻게 변해 왔고 지금 어떤 상태인가. '
             '앞날을 맞히는 도구가 아니라, 확인된 것과 아직 확인되지 않은 것을 구분해 보여주는 현황판입니다.</p>', unsafe_allow_html=True)
@@ -43,9 +48,6 @@ if stt is not None:
         st.warning("자동 갱신에 문제가 있습니다: " + "; ".join(stt["warnings"])[:300] + " (자세한 내용: 갱신 현황 페이지)")
     elif _age > 72:
         st.warning(f"자동 갱신이 {_age/24:.0f}일 전 이후 실행되지 않았습니다. 서버 크론을 확인하세요.")
-st.caption(f"시장 상태 · {state['regime']} 국면(성장 {'가속' if state['growth']=='Accelerating' else '둔화'}, 물가 "
-           f"{'가속' if state['inflation']=='Accelerating' else '둔화'}) · 정책 {state['policy']} · 유동성 {state['liquidity']} · 달러 {state['dollar']}"
-           f" · {state['days_in_regime']}거래일째 유지")
 
 # ── 공통 값 ──────────────────────────────────────────────────────────────────
 etf = sec[sec.flow_src == "ETF유입"].copy().merge(usd, left_on="name", right_on="sector", how="left")
@@ -102,18 +104,12 @@ def detail():
 
 
 def flow_detail():
-    ui.stage("과거", "최근 1년, 섹터별 자금은 어떻게 움직였나", "20일 순유입(%순자산) · 위 띠는 매크로 국면")
+    ui.stage("과거", "최근 1년, 섹터별 자금은 어떻게 움직였나", "20일 순유입(%순자산)")
     d = fh.tail(52)
     secs = [c for c in d.columns if c != "regime"]
-    codes = {"Goldilocks": 0, "Reflation": 1, "Slowdown": 2, "Stagflation": 3}
-    colors = ["#22a55a", "#e0b41e", "#5b8def", "#ee5555"]
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.07, 0.93], vertical_spacing=0.015)
-    fig.add_trace(go.Heatmap(z=[d["regime"].map(codes).astype(float).values], x=d.index, colorscale=[[i / 3, c] for i, c in enumerate(colors)], zmin=0, zmax=3,
-                             showscale=False, text=[d["regime"].fillna("").values], hovertemplate="%{x|%Y-%m-%d} %{text}<extra></extra>"), row=1, col=1)
-    fig.add_trace(go.Heatmap(z=(d[secs].T * 100).clip(-10, 10).values, x=d.index, y=secs, colorscale="RdYlGn", zmid=0, zmin=-10, zmax=10,
-                             colorbar=dict(title="%", len=0.7, thickness=10), hovertemplate="%{y} %{x|%Y-%m-%d}: %{z:+.1f}%<extra></extra>"), row=2, col=1)
-    fig.update_yaxes(visible=False, row=1, col=1)
-    fig.update_yaxes(autorange="reversed", row=2, col=1)
+    fig = go.Figure(go.Heatmap(z=(d[secs].T * 100).clip(-10, 10).values, x=d.index, y=secs, colorscale="RdYlGn", zmid=0, zmin=-10, zmax=10,
+                               colorbar=dict(title="%", len=0.7, thickness=10), hovertemplate="%{y} %{x|%Y-%m-%d}: %{z:+.1f}%<extra></extra>"))
+    fig.update_yaxes(autorange="reversed")
     plot(fig, 360, legend=False)
     ui.note('<p class="note">초록=자금 유입, 빨강=유출. 위 띠 색: 초록 Goldilocks · 노랑 Reflation · 파랑 Slowdown · 빨강 Stagflation. '
                 '더 긴 기간(2007~)은 <b>① 월가 자금</b> 페이지에서 봅니다.</p>')

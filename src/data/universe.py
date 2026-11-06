@@ -14,7 +14,7 @@ YAHOO = {
     "XBI": "Biotech(XBI)", "XAR": "Aerospace&Defense(XAR)", "KRE": "Regional Banks", "XHB": "Homebuilders",
     "XRT": "Retail", "URA": "Uranium/Nuclear", "COPX": "Copper Miners", "XME": "Metals&Mining", "SLX": "Steel",
     # 매크로 가격
-    "^VIX": "VIX", "^MOVE": "MOVE", "DX-Y.NYB": "DXY", "CL=F": "WTI", "GC=F": "Gold",
+    "^GSPC": "S&P500 index(1930~)", "^IRX": "US 3M", "^VIX": "VIX", "^MOVE": "MOVE", "DX-Y.NYB": "DXY", "CL=F": "WTI", "GC=F": "Gold",
     "^TNX": "US10Y(yahoo)", "HYG": "HY bond ETF", "LQD": "IG bond ETF", "TLT": "20Y+ Treasury",
     # 한국
     "^KS11": "KOSPI", "^KQ11": "KOSDAQ", "KRW=X": "USDKRW",
