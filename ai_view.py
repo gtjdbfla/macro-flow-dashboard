@@ -16,7 +16,7 @@ FILING_NOTES = (
      "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm"),
     ("Alphabet", "2026-09-30", "구매약정 9,240억 달러와 미개시 리스 및 기타 의무 1,520억 달러를 공시. "
      "일부 약정은 가격·물량에 따라 실제 지출이 달라질 수 있음.",
-     "https://abc.xyz/investor/events/event-details/default.aspx"),
+     "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000084/goog-20260930.htm"),
     ("Meta", "2026-09-30", "미개시 리스 3,557억 달러. 데이터센터·에너지·네트워크 인프라 등을 포함.",
      "https://www.sec.gov/Archives/edgar/data/1326801/000162828026066773/meta-20260930.htm"),
 )
@@ -90,7 +90,7 @@ def _guidance_tracker():
         st.markdown(
             f"**AI 매출에 가까운 직접 공개치** · Microsoft는 9월 분기 Foundry 매출이 전년의 3배를 넘었다고 밝혔고, "
             f"Alphabet은 연초부터 9월까지 Google Cloud의 AI 매출이 수백억 달러 규모라고 밝혔습니다. "
-            f"[Microsoft 실적 설명]({guidance.MSFT_OCT}) · [Alphabet 실적 설명]({guidance.GOOGL_OCT})"
+            f"[Microsoft 실적 설명]({guidance.MSFT_OCT}) · [Alphabet 10-Q]({guidance.GOOGL_10Q})"
         )
     with pending:
         upcoming = rows[~observed].drop(columns=["실제", "실적 원문"])
