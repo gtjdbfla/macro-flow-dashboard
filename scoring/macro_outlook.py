@@ -77,7 +77,7 @@ def snapshot(as_of, market_level, shock, market_ready):
         "credit": _metric("credit", credit, credit.diff(20).mul(100).round(6), as_of, 5),
         "liquidity": _metric("liquidity", liquidity, liquidity.pct_change(4, fill_method=None) * 100, as_of, 10),
         "labor": _metric("labor", claims, claims.pct_change(4, fill_method=None) * 100, as_of, 14),
-        "inflation": _metric("inflation", cpi, cpi.diff(3), as_of, 65),
+        "inflation": _metric("inflation", cpi, cpi.diff(3), as_of, 80),
     }
     return {"as_of": as_of.date().isoformat(), "metrics": metrics,
             "outlook": outlook(metrics, market_level, shock, market_ready)}
