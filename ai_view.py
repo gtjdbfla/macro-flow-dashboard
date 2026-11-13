@@ -6,12 +6,12 @@ import ui
 from src.ai import guidance
 
 # XBRL 공통 태그로 확보하지 못하는 주석은 공시 기준일과 원문을 함께 표시한다.
-CRWV_DATE = "2026-06-30"
-CRWV_FILING = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000366/crwv-20260630.htm"
-CRWV_AVAILABLE_CREDIT = 10.014e9
+CRWV_DATE = "2026-09-30"
+CRWV_FILING = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000465/crwv-20260930.htm"
+CRWV_AVAILABLE_CREDIT = 5.653e9
 FILING_NOTES = (
-    ("CoreWeave", CRWV_DATE, "수주잔고 1,037억 달러 중 41%를 첫 24개월 내 매출로 인식할 것으로 예상. "
-     "분기 매출의 62%는 상위 두 고객에서 발생.", CRWV_FILING),
+    ("CoreWeave", CRWV_DATE, "수주잔고 1,323억 달러 중 36%를 첫 24개월 내 매출로 인식할 것으로 예상. "
+     "분기 매출의 54%(30%·24%)는 상위 두 고객에서 발생.", CRWV_FILING),
     ("Microsoft", "2026-09-30", "분기 중 금융리스로 취득한 사용권자산 52억 달러. 현금 CAPEX와 취득 방식이 다름.",
      "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm"),
     ("Alphabet", "2026-09-30", "구매약정 9,240억 달러와 미개시 리스 및 기타 의무 1,520억 달러를 공시. "
