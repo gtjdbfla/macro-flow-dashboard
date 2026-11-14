@@ -72,12 +72,15 @@ def snapshot(as_of, market_level, shock, market_ready):
                  - _fred("RRPONTSYD", as_of)).dropna().asfreq("W-WED")
     claims = _first_print("ICSA", as_of).asfreq("W-SAT").rolling(4).mean()
     cpi = _first_print("CPILFESL", as_of).asfreq("MS").pct_change(12, fill_method=None) * 100
+    # 비교 월 값이 빠진 달(전년 같은 달 CPI 미발표)은 전년비를 못 구한다. 계산 가능한 마지막 달로 판정한다.
+    cpi_change = cpi.diff(3)
+    usable = cpi.notna() & cpi_change.notna()
     metrics = {
         "rates": _metric("rates", rates, rates.diff(20).mul(100).round(6), as_of, 5),
         "credit": _metric("credit", credit, credit.diff(20).mul(100).round(6), as_of, 5),
         "liquidity": _metric("liquidity", liquidity, liquidity.pct_change(4, fill_method=None) * 100, as_of, 10),
         "labor": _metric("labor", claims, claims.pct_change(4, fill_method=None) * 100, as_of, 14),
-        "inflation": _metric("inflation", cpi, cpi.diff(3), as_of, 80),
+        "inflation": _metric("inflation", cpi[usable], cpi_change[usable], as_of, 80),
     }
     return {"as_of": as_of.date().isoformat(), "metrics": metrics,
             "outlook": outlook(metrics, market_level, shock, market_ready)}

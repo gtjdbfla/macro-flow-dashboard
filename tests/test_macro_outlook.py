@@ -49,3 +49,17 @@ def test_snapshot_uses_only_available_observations_and_keeps_missing_visible(tmp
     snapshot = mo.snapshot("2026-11-23", "보통", False, True)
     assert snapshot["metrics"]["rates"]["state"] == "stale"
     assert snapshot["metrics"]["labor"]["state"] == "stale"
+
+
+def test_inflation_falls_back_to_last_month_with_a_year_over_year_value(tmp_path, monkeypatch):
+    monkeypatch.setattr(mo, "PARQUET", tmp_path)
+    months = pd.date_range("2024-01-01", "2026-10-01", freq="MS")
+    values = pd.Series(range(len(months)), index=months, dtype=float) + 300
+    values = values.drop(pd.Timestamp("2025-10-01"))   # 전년 같은 달 값이 없으면 2026-10 전년비를 못 구한다
+    cpi = pd.DataFrame({"date": values.index, "available_at": values.index + pd.Timedelta(days=45),
+                        "value": values.to_numpy()})
+    cpi.to_parquet(tmp_path / "fredv_CPILFESL.parquet")
+
+    inflation = mo.snapshot("2026-11-12", "보통", False, True)["metrics"]["inflation"]
+    assert inflation["as_of"] == "2026-09-01"
+    assert inflation["state"] in {"supportive", "neutral", "adverse"}
