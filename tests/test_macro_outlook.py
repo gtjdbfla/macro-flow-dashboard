@@ -63,3 +63,16 @@ def test_inflation_falls_back_to_last_month_with_a_year_over_year_value(tmp_path
     inflation = mo.snapshot("2026-11-12", "보통", False, True)["metrics"]["inflation"]
     assert inflation["as_of"] == "2026-09-01"
     assert inflation["state"] in {"supportive", "neutral", "adverse"}
+
+
+def test_liquidity_uses_previous_business_day_repo_when_wednesday_is_a_holiday(tmp_path, monkeypatch):
+    monkeypatch.setattr(mo, "PARQUET", tmp_path)
+    weeks = pd.date_range("2026-10-07", "2026-11-11", freq="W-WED")
+    pd.DataFrame({"value": [7_000_000.0] * len(weeks)}, index=weeks).to_parquet(tmp_path / "fred_WALCL.parquet")
+    pd.DataFrame({"value": [900_000.0] * len(weeks)}, index=weeks).to_parquet(tmp_path / "fred_WTREGEN.parquet")
+    days = pd.bdate_range("2026-10-07", "2026-11-13").drop(pd.Timestamp("2026-11-11"))
+    pd.DataFrame({"value": [10.0] * len(days)}, index=days).to_parquet(tmp_path / "fred_RRPONTSYD.parquet")
+
+    liquidity = mo.snapshot("2026-11-13", "보통", False, True)["metrics"]["liquidity"]
+    assert liquidity["as_of"] == "2026-11-11"
+    assert liquidity["value"] == 6090.0

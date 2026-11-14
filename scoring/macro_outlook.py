@@ -67,9 +67,10 @@ def snapshot(as_of, market_level, shock, market_ready):
     as_of = pd.Timestamp(as_of)
     rates = _fred("DFII10", as_of)
     credit = _fred("BAMLH0A0HYM2", as_of)
-    # 수요일 기준 Fed 자산·TGA와 같은 날짜의 역레포만 결합한다. 단위는 십억 달러.
-    liquidity = ((_fred("WALCL", as_of) - _fred("WTREGEN", as_of)) / 1000
-                 - _fred("RRPONTSYD", as_of)).dropna().asfreq("W-WED")
+    # 수요일 기준 Fed 자산·TGA에 그날의 역레포를 결합한다. 수요일이 휴장이면 직전 영업일 값을 쓴다(4일 이내). 단위는 십억 달러.
+    net = (_fred("WALCL", as_of) - _fred("WTREGEN", as_of)) / 1000
+    rrp = _fred("RRPONTSYD", as_of).reindex(net.index, method="ffill", tolerance=pd.Timedelta(days=4))
+    liquidity = (net - rrp).dropna().asfreq("W-WED")
     claims = _first_print("ICSA", as_of).asfreq("W-SAT").rolling(4).mean()
     cpi = _first_print("CPILFESL", as_of).asfreq("MS").pct_change(12, fill_method=None) * 100
     # 비교 월 값이 빠진 달(전년 같은 달 CPI 미발표)은 전년비를 못 구한다. 계산 가능한 마지막 달로 판정한다.
