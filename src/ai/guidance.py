@@ -14,8 +14,8 @@ META_OCT = "https://investor.atmeta.com/investor-news/press-release-details/2026
 ORCL_JUN = "https://investor.oracle.com/investor-news/news-details/2026/Oracle-Announces-Record-Q4-and-FY-2026-Results-Driven-by-Cloud-Infrastructure--Cloud-Applications/default.aspx"
 ORCL_SEP = "https://investor.oracle.com/investor-news/news-details/2026/Oracle-Announces-Q1-Results-Driven-by-Triple-Digit-Growth-in-Cloud-Infrastructure-Revenues/default.aspx"
 ORCL_10Q = "https://www.sec.gov/Archives/edgar/data/1341439/000119312526389274/orcl-20260831.htm"
-GOOGL_OCT = "https://abc.xyz/investor/events/event-details/default.aspx"
-CRWV_10Q = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000366/crwv-20260630.htm"
+GOOGL_10Q = "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000084/goog-20260930.htm"
+CRWV_10Q = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000465/crwv-20260930.htm"
 
 NAMES = {"MSFT": "Microsoft", "ORCL": "Oracle", "AMZN": "Amazon", "META": "Meta"}
 CIK = {"MSFT": 789019, "ORCL": 1341439, "AMZN": 1018724, "META": 1326801}
@@ -64,8 +64,8 @@ GUIDES = (
 BACKLOG = (
     ("Microsoft", "2026-09-30", "상업 부문 RPO", 6770, 12, "약 30%", .30, MSFT_10Q),
     ("Oracle", "2026-08-31", "회사 전체 RPO", 6640, 12, "약 13%", .13, ORCL_10Q),
-    ("Alphabet", "2026-09-30", "Google Cloud 계약잔고", 5610, 24, "55% 조금 넘음", .55, GOOGL_OCT),
-    ("CoreWeave", "2026-06-30", "회사 전체 RPO", 1037, 24, "41%", .41, CRWV_10Q),
+    ("Alphabet", "2026-09-30", "Google Cloud 계약잔고", 5608, 24, "55% 조금 넘음", .55, GOOGL_10Q),
+    ("CoreWeave", "2026-09-30", "회사 전체 RPO", 1323, 24, "36%", .36, CRWV_10Q),
 )
 
 
