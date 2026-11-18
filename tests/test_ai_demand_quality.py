@@ -52,3 +52,10 @@ def test_pending_when_fewer_than_three_checks(monkeypatch):
     monkeypatch.setattr(dq, "COMMITMENTS", ())
     t = dq.table(_sec([(q, 100, 50, 100, 90, 100) for q in QUARTERS[:4]]))
     assert dq.flags(t)[0]["level"] == "보류"
+
+
+def test_platform_share_is_within_data_center_customers():
+    mix = dq.platform()
+    assert mix.period_end.is_monotonic_increasing
+    last = mix.iloc[-1]
+    assert last.ai_clouds_share == pytest.approx(475 / (601 + 475))

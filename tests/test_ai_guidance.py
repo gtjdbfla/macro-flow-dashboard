@@ -26,3 +26,12 @@ def test_guidance_matches_period_metric_and_company():
     meta = rows.loc[("Meta", "2026-09-30", "회사 전체 매출")]
     assert meta["결과"] == "범위 상회"
     assert meta["같은 분기 회사 전체 FCF (억 달러)"] == pytest.approx(-11.57)
+
+
+def test_nvidia_guidance_uses_release_actuals_until_10q():
+    rows = comparisons(pd.DataFrame(columns=["ticker", "end", "metric", "value", "filed"])).set_index(["회사", "대상 분기말", "지표"])
+    revenue = rows.loc[("NVIDIA", "2026-10-25", "회사 전체 매출")]
+    assert revenue["결과"] == "범위 상회"
+    margin = rows.loc[("NVIDIA", "2026-10-25", "GAAP 매출총이익률")]
+    assert margin["결과"] == "범위 상회"
+    assert rows.loc[("NVIDIA", "2027-01-31", "회사 전체 매출")]["결과"] == "실적 확인 대기"

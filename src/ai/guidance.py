@@ -16,9 +16,13 @@ ORCL_SEP = "https://investor.oracle.com/investor-news/news-details/2026/Oracle-A
 ORCL_10Q = "https://www.sec.gov/Archives/edgar/data/1341439/000119312526389274/orcl-20260831.htm"
 GOOGL_10Q = "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000084/goog-20260930.htm"
 CRWV_10Q = "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000465/crwv-20260930.htm"
+NVDA_MAY = "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000051/q1fy27cfocommentary.htm"
+NVDA_AUG = "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/q2fy27cfocommentary.htm"
+NVDA_NOV = "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000088/q3fy27cfocommentary.htm"
 
-NAMES = {"MSFT": "Microsoft", "ORCL": "Oracle", "AMZN": "Amazon", "META": "Meta"}
-CIK = {"MSFT": 789019, "ORCL": 1341439, "AMZN": 1018724, "META": 1326801}
+NAMES = {"MSFT": "Microsoft", "ORCL": "Oracle", "AMZN": "Amazon", "META": "Meta", "NVDA": "NVIDIA"}
+CIK = {"MSFT": 789019, "ORCL": 1341439, "AMZN": 1018724, "META": 1326801, "NVDA": 1045810}
+NVDA_GM = "GAAP 매출총이익률"
 AZURE = "Azure 매출 전년비 · 환율 고정"
 ORACLE_CLOUD = "전체 클라우드 매출 전년비 · USD"
 
@@ -49,6 +53,13 @@ GUIDES = (
           sec_metric="op_income", actual=280.76, actual_source=AMZN_OCT),
     Guide("META", "2026-09-30", "2026-07-29", "회사 전체 매출", "억 달러", 610, 640, META_JUL,
           sec_metric="revenue", actual=646.01, actual_source=META_OCT),
+    # NVIDIA 매출 가이던스는 중앙값 ±2%(4분기는 ±3%, 한 주 더 긴 분기). 회계 분기말 기준.
+    Guide("NVDA", "2026-07-26", "2026-05-20", "회사 전체 매출", "억 달러", 891.8, 928.2, NVDA_MAY,
+          sec_metric="revenue", actual=962.21, actual_source=NVDA_AUG),
+    Guide("NVDA", "2026-07-26", "2026-05-20", NVDA_GM, "%", 74.4, 75.4, NVDA_MAY, actual=75.0, actual_source=NVDA_NOV),
+    Guide("NVDA", "2026-10-25", "2026-08-26", "회사 전체 매출", "억 달러", 1058.4, 1101.6, NVDA_AUG,
+          sec_metric="revenue", actual=1158, actual_source=NVDA_NOV),
+    Guide("NVDA", "2026-10-25", "2026-08-26", NVDA_GM, "%", 73.5, 74.5, NVDA_AUG, actual=74.8, actual_source=NVDA_NOV),
     Guide("MSFT", "2026-12-31", "2026-10-28", AZURE, "%", 49, 50, MSFT_OCT),
     Guide("MSFT", "2026-12-31", "2026-10-28", "Microsoft Cloud 매출총이익률", "%", 65, 65, MSFT_OCT),
     Guide("ORCL", "2026-11-30", "2026-09-10", ORACLE_CLOUD, "%", 65, 71, ORCL_SEP),
@@ -58,6 +69,8 @@ GUIDES = (
           sec_metric="op_income"),
     Guide("META", "2026-12-31", "2026-10-21", "회사 전체 매출", "억 달러", 730, 760, META_OCT,
           sec_metric="revenue"),
+    Guide("NVDA", "2027-01-31", "2026-11-17", "회사 전체 매출", "억 달러", 1261, 1339, NVDA_NOV, sec_metric="revenue"),
+    Guide("NVDA", "2027-01-31", "2026-11-17", NVDA_GM, "%", 71, 72, NVDA_NOV),
 )
 
 # 서로 다른 회사의 인식 기간이나 계약 범위는 합산하지 않는다.

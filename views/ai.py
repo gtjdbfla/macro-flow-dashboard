@@ -204,6 +204,37 @@ if dq is not None and "F16" in fl:
         ui.note("보증·네오클라우드·지분투자·클라우드 서비스 약정만 고객 금융으로 더합니다. 보증은 공시된 최대 노출이며 "
                 "SB Energy(OpenAI 전용 부지) 1,050억 달러는 2029 회계연도부터 단계적으로 발효됩니다. "
                 "공급 약정과 리스는 NVIDIA 자신의 지출이라 참고로만 표시합니다.")
+    p1, p2 = st.columns(2, gap="large")
+    with p1:
+        st.markdown("**누가 GPU를 사나** (NVIDIA 데이터센터 매출, 억 달러)")
+        mix = demand_quality.platform()
+        fig = go.Figure()
+        fig.add_bar(x=mix.period_end, y=mix.hyperscale, name="하이퍼스케일", marker_color="#5b8def")
+        fig.add_bar(x=mix.period_end, y=mix.ai_clouds, name="AI 클라우드·산업·기업", marker_color="#f97316")
+        fig.add_scatter(x=mix.period_end, y=mix.ai_clouds_share * 100, name="AI 클라우드 등 비중(%, 오른쪽)", mode="lines+markers",
+                        yaxis="y2", line=dict(color="#8a99a3", width=2))
+        fig.update_layout(barmode="stack", yaxis2=dict(overlaying="y", side="right", showgrid=False, range=[0, 100]))
+        plot(fig, 280)
+        ui.note("AI 클라우드·산업·기업에는 네오클라우드(CoreWeave 등)와 AI 기업이 들어갑니다. 이 비중이 커질수록 차입 의존 고객의 조달 신호(F10·F11)가 "
+                "NVIDIA 매출에 더 중요해집니다. NVIDIA가 2026년 8월 고객 분류를 소급 변경해, 변경 후 기준으로 다시 공시된 분기만 표시합니다.")
+    with p2:
+        st.markdown("**이익은 어디에 쌓이나** (영업이익률 %)")
+        sec_q = load_parquet_dir("sec_quarterly.parquet")
+        fig = go.Figure()
+        if sec_q is not None:
+            nv = sec_q[(sec_q.ticker == "NVDA") & sec_q.metric.isin(["revenue", "op_income"])]
+            nv = nv.pivot_table(index="end", columns="metric", values="value").dropna().sort_index()
+            nv = nv[nv.index >= "2023-01-01"]
+            fig.add_scatter(x=nv.index, y=nv.op_income / nv.revenue * 100, name="NVIDIA", mode="lines+markers",
+                            line=dict(color="#22a55a", width=2.6))
+        ch = load("results/ai_cloud_history.parquet")
+        if ch is not None:
+            for tk, nm, col in [("AMZN", "AWS", "#f59e0b"), ("GOOGL", "Google Cloud", "#5b8def")]:
+                g = ch[(ch.ticker == tk) & (ch.quarter_end >= "2023-01-01")].sort_values("quarter_end")
+                fig.add_scatter(x=g.quarter_end, y=g.margin * 100, name=nm, mode="lines+markers", line=dict(color=col, width=2))
+        plot(fig, 280)
+        ui.note("AI 수익성이 아래로 퍼지면 NVIDIA 마진은 내려오고 클라우드 마진은 올라오는 모습이 됩니다. NVIDIA는 회사 전체, "
+                "AWS·Google Cloud는 부문 영업이익률이며 회계 분기말이 다릅니다. NVIDIA 최신 분기는 10-Q 제출 후 표시됩니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────

@@ -31,6 +31,25 @@ COMMITMENTS = (
 )
 
 
+# 데이터센터 매출의 고객 구분(억 달러). 2분기 코멘터리부터 고객 분류를 소급 변경했다(1분기 하이퍼스케일 378.7 → 430.5).
+# 변경 후 기준으로 다시 공시된 분기만 둔다. 각 분기는 가장 최근 코멘터리의 값.
+PLATFORM = (
+    ("2025-07-27", 241.68, 169.28, Q2FY27),
+    ("2025-10-26", 351, 161, Q3FY27),
+    ("2026-04-26", 430.50, 321.96, Q2FY27),
+    ("2026-07-26", 487.10, 403.13, Q2FY27),
+    ("2026-10-25", 601, 475, Q3FY27),
+)
+
+
+def platform():
+    """하이퍼스케일 vs AI 클라우드·산업·기업(네오클라우드 포함). 비중은 데이터센터 매출 중."""
+    d = pd.DataFrame(PLATFORM, columns=["period_end", "hyperscale", "ai_clouds", "source"])
+    d["period_end"] = pd.to_datetime(d.period_end)
+    d["ai_clouds_share"] = d.ai_clouds / (d.hyperscale + d.ai_clouds)
+    return d
+
+
 def _quarters(sec):
     d = sec.loc[(sec.ticker == "NVDA") & sec.metric.isin(["revenue", "ar", "inventory", "ocf", "net_income"])]
     d = d.sort_values("filed").drop_duplicates(["end", "metric"], keep="first")
