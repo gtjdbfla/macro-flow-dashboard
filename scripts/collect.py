@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data import DATA_DIR, cftc, cloud, debt, fred, french, gpurent, sec, ssga, twse, yahoo  # noqa: E402
+from src.data import DATA_DIR, cftc, cloud, debt, fred, french, gpurent, sec, ssga, tokenprice, twse, yahoo  # noqa: E402
 from src.data.universe import CFTC, FRED_CREDIT, FRED_DAILY, FRED_VINTAGE, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
@@ -59,6 +59,11 @@ if not only or "gpurent" in only:
         cov["gpurent"] = {"updated": now, "series": {"daily": gpurent.collect()}}
     except Exception as e:
         cov["gpurent"] = {"updated": now, "series": {}, "error": str(e)[:200]}
+if not only or "tokenprice" in only:
+    try:
+        cov["tokenprice"] = {"updated": now, "series": {"daily": tokenprice.collect()}}
+    except Exception as e:
+        cov["tokenprice"] = {"updated": now, "series": {}, "error": str(e)[:200]}
 if not only or "ssga" in only:
     cov["ssga"] = {"updated": now, "series": ssga.collect()}
     try:

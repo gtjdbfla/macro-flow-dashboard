@@ -86,6 +86,11 @@ sw, sw_hist = ED.software(sec)
 ramp.reset_index(names="date").to_parquet(out / "ai_end_ramp.parquet")
 sw.to_parquet(out / "ai_end_software.parquet")
 sw_hist.to_parquet(out / "ai_end_software_history.parquet")
+ED.ai_revenue_coverage(pd.read_parquet(out / "ai_history.parquet")).to_parquet(out / "ai_end_revenue_coverage.parquet")
+if (PARQUET / "token_prices.parquet").exists():
+    tp = pd.read_parquet(PARQUET / "token_prices.parquet")
+    ED.token_price_index(tp).to_parquet(out / "ai_token_price_index.parquet")
+    ED.new_model_prices(tp).to_parquet(out / "ai_token_new_models.parquet")
 fl = sorted(fl + C.flags(ch, tw) + cr_fl + s_fl + gpu_fl + DQ.flags(dq) + ED.flags(ramp, sw), key=lambda f: int(f["id"][1:]))
 (out / "ai_flags.json").write_text(json.dumps({"flags": fl, "latest_filed": str(sec["filed"].max().date())},
                                               ensure_ascii=False, indent=1), encoding="utf-8")

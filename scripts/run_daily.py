@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("MACRO_DATA_DIR", ROOT / "data"))
 PARQ = DATA / "parquet"
 PY = sys.executable
-COLLECT = {"us": ["yahoo", "cftc", "fred", "ssga", "sec", "cloud", "debt"], "kr": ["yahoo_kr", "kis", "kis_stocks"],
+COLLECT = {"us": ["yahoo", "cftc", "fred", "ssga", "sec", "cloud", "debt", "gpurent", "tokenprice"], "kr": ["yahoo_kr", "kis", "kis_stocks"],
            "filings": ["sec", "cloud", "debt"], "weekly": ["french"]}
 FEATURES = ("build_features", ["scripts/build_features.py"], True, 900)
 BACKTESTS = ("run_backtests", ["scripts/run_backtests.py"], False, 900)
@@ -84,6 +84,10 @@ def filings_snapshot():
     return snap
 
 
+# 외부 소규모 공개 자료: 실패해도 전체 수집을 재시도하지 않고 경고만 남긴다(누적형이라 다음 날 다시 받는다).
+OPTIONAL = {"gpurent", "tokenprice"}
+
+
 def collect_health(sources):
     try:
         cov = json.loads((DATA / "coverage.json").read_text(encoding="utf-8"))
@@ -98,7 +102,7 @@ def collect_health(sources):
         series = v.get("series", {})
         n_err = sum("error" in x for x in series.values())
         if v.get("error") or (series and n_err == len(series)):
-            hard.append(f"{s}: {v.get('error') or '전 시리즈 오류'}")
+            (soft if s in OPTIONAL else hard).append(f"{s}: {v.get('error') or '전 시리즈 오류'}")
         elif series and n_err / len(series) > 0.3:
             soft.append(f"{s}: 시리즈 {n_err}/{len(series)} 오류")
     return hard, soft

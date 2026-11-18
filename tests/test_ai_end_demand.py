@@ -54,3 +54,23 @@ def test_software_yoy_compares_same_company_year_ago():
     assert crm.yoy_prev == pytest.approx(0.1)
     assert crm.accel == pytest.approx(0.1)
     assert crm.gm_chg == pytest.approx(0.675 - 0.7)
+
+
+def test_token_price_index_chains_only_same_models():
+    day1, day2 = pd.Timestamp("2026-11-18"), pd.Timestamp("2026-11-19")
+    df = pd.DataFrame([
+        ("a/x", day1, 1.0, 10.0), ("a/y", day1, 1.0, 20.0), ("a/x:free", day1, 0.0, 0.0),
+        ("a/x", day2, 1.0, 5.0), ("a/y", day2, 1.0, 20.0), ("a/new", day2, 1.0, 1.0),
+    ], columns=["id", "fetched", "prompt", "completion"])
+    df["created"] = pd.Timestamp("2026-10-01")
+    idx = ed.token_price_index(df).set_index("fetched")["index"]
+    assert idx[day1] == 100
+    assert idx[day2] == pytest.approx(100 * (0.5 * 1.0) ** 0.5)
+
+
+def test_revenue_coverage_uses_same_quarter_capex():
+    hist = pd.DataFrame({"ticker": ["MSFT", "MSFT", "AMZN"],
+                         "period_end": pd.to_datetime(["2024-12-31", "2026-03-31", "2026-06-30"]),
+                         "capex_ttm": [520e8, 740e8, 1000e8]})
+    cov = ed.ai_revenue_coverage(hist).set_index(["ticker", "period_end"])
+    assert cov.loc[("MSFT", pd.Timestamp("2026-03-31")), "coverage"] == pytest.approx(370 / 740)

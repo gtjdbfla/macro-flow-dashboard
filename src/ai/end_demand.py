@@ -1,4 +1,5 @@
 """최종 수요 — AI에 돈을 내는가. F17 Ramp AI 도입률, F18 소프트웨어 바스켓 매출화. 규칙은 docs/AI_PROFITABILITY.md에 사전 등록."""
+import numpy as np
 import pandas as pd
 
 from src.data import PARQUET
@@ -96,3 +97,67 @@ def flags(r, t, as_of=None):
                 "text": f"{len(ok)}곳 중앙값: 매출 전년비 {ok.yoy.median():+.0%}(1년 전 {ok.yoy_prev.median():+.0%}, 가속도 {acc * 100:+.1f}%p), "
                         f"매출총이익률 전년 대비 {gm * 100:+.1f}%p({len(ok_gm)}곳). 가속 상위: {up}. AI 이외의 요인(경기·가격·인수)도 섞입니다."})
     return out
+
+
+# 회사가 실적 발표(8-K Ex.99.1)에서 밝힌 AI 연환산 매출. 금액 단위 억 달러. 판정 없이 표시만 한다(docs/AI_PROFITABILITY.md).
+# Microsoft는 2026-09 분기 부문 개편 뒤 AI 연환산 매출을 내지 않았다. Amazon은 칩 사업(Trainium 등)과 따로 밝힌 AI 사업만 쓴다.
+AI_REVENUE = (
+    ("MSFT", "2024-12-31", 130, "AI 사업 연환산 매출 130억 달러 초과(전년 대비 +175%)",
+     "https://www.sec.gov/Archives/edgar/data/789019/000095017025010484/msft-ex99_1.htm"),
+    ("MSFT", "2026-03-31", 370, "AI 사업 연환산 매출 370억 달러 초과(전년 대비 +123%)",
+     "https://www.sec.gov/Archives/edgar/data/789019/000119312526191457/msft-ex99_1.htm"),
+    ("AMZN", "2026-06-30", 250, "AI 사업 연환산 매출 250억 달러 초과(칩 사업과 별도)",
+     "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000024/amzn-20260630xex991.htm"),
+)
+# Gemini 1차 모델 API 처리량(분당 10억 토큰). 발표 문구가 "over"·"more than"·"nearly"라 근사값이다.
+GEMINI_TOKENS = (
+    ("2025-09-30", 7, "https://www.sec.gov/Archives/edgar/data/1652044/000165204425000087/googexhibit991q32025.htm"),
+    ("2025-12-31", 10, "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000012/googexhibit991q42025.htm"),
+    ("2026-03-31", 16, "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000043/googexhibit991q12026.htm"),
+    ("2026-06-30", 22, "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000066/googexhibit991q22026.htm"),
+    ("2026-09-30", 32, "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000080/googexhibit991q32026.htm"),
+)
+
+
+def ai_revenue_coverage(hist):
+    """AI 연환산 매출 ÷ 같은 분기말까지 12개월 현금 CAPEX. hist는 ai_history(ticker, period_end, capex_ttm)."""
+    rows = []
+    for ticker, end, run_rate, text, source in AI_REVENUE:
+        h = hist[(hist.ticker == ticker) & (hist.period_end == pd.Timestamp(end))]
+        capex = float(h.capex_ttm.iloc[0]) / 1e8 if len(h) and pd.notna(h.capex_ttm.iloc[0]) else None
+        rows.append({"ticker": ticker, "period_end": pd.Timestamp(end), "run_rate": run_rate, "capex_ttm": capex,
+                     "coverage": run_rate / capex if capex else None, "text": text, "source": source})
+    return pd.DataFrame(rows)
+
+
+def _priced(df):
+    d = df[~df.id.str.contains(":") & (df.completion > 0) & (df.prompt >= 0)]
+    return d
+
+
+def token_price_index(df):
+    """같은 모델의 게시가격 변화만 이어 붙인 지수(첫 수집일 = 100). 신모델 출시가 아니라 기존 모델의 가격 인하를 잰다."""
+    d = _priced(df)
+    days = sorted(d.fetched.unique())
+    level, out = 100.0, []
+    for i, day in enumerate(days):
+        if i:
+            a = d[d.fetched == days[i - 1]].set_index("id").completion
+            b = d[d.fetched == day].set_index("id").completion
+            both = a.index.intersection(b.index)
+            if len(both):
+                level *= float(np.exp(np.log(b[both] / a[both]).mean()))
+        out.append({"fetched": day, "index": level, "models": int((d.fetched == day).sum())})
+    return pd.DataFrame(out)
+
+
+def new_model_prices(df):
+    """최신 수집본에서 출시 월별 모델의 출력 가격 중앙값(USD/100만 토큰). 지금도 목록에 남은 모델만이라 생존 편향이 있다."""
+    d = _priced(df)
+    if d.empty:
+        return pd.DataFrame(columns=["month", "median_completion", "models"])
+    d = d[d.fetched == d.fetched.max()]
+    g = d.groupby(d.created.dt.to_period("M"))
+    out = pd.DataFrame({"median_completion": g.completion.median(), "models": g.size()}).reset_index(names="month")
+    out["month"] = out.month.dt.to_timestamp()
+    return out[out.month >= "2024-01-01"]

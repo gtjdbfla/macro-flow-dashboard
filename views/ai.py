@@ -9,6 +9,7 @@ import streamlit as st
 import ai_view
 import ui
 from src.ai import demand_quality
+from src.ai.end_demand import GEMINI_TOKENS as ED_TOKENS
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
 meta = load("views/meta.json")
@@ -260,6 +261,41 @@ if ramp is not None and sw is not None and "F17" in fl and "F18" in fl:
         st.dataframe(tb.round(1), hide_index=True, width="stretch", height=390)
         ui.note("가속도는 매출 전년비가 1년 전보다 얼마나 빨라졌는지입니다. 마진 하락은 AI 추론 비용 부담을 뜻할 수 있습니다. "
                 "Intuit·Workday는 표준 매출원가 공시가 없어 마진이 비어 있습니다. 바스켓은 재무를 보기 전에 고정했고 AI 이외의 요인도 섞입니다.")
+    cov = load("results/ai_end_revenue_coverage.parquet")
+    tpi = load("results/ai_token_price_index.parquet")
+    tnm = load("results/ai_token_new_models.parquet")
+    e3, e4 = st.columns(2, gap="large")
+    with e3:
+        st.markdown("**AI 매출은 투자를 얼마나 따라왔나** (회사 발표 AI 연환산 매출 ÷ 12개월 현금 CAPEX)")
+        if cov is not None:
+            ct = pd.DataFrame({"회사": cov.ticker, "분기말": pd.to_datetime(cov.period_end).dt.strftime("%Y-%m"),
+                               "AI 연환산 매출(억$)": cov.run_rate, "12개월 CAPEX(억$)": cov.capex_ttm.round(0),
+                               "매출 ÷ CAPEX": cov.coverage, "원문": cov.source})
+            st.dataframe(ct, hide_index=True, width="stretch", column_config={
+                "원문": st.column_config.LinkColumn(display_text="보기"),
+                "매출 ÷ CAPEX": st.column_config.NumberColumn(format="%.2f")})
+        gem = pd.DataFrame(ED_TOKENS, columns=["period_end", "tokens", "source"])
+        fig = go.Figure()
+        fig.add_scatter(x=pd.to_datetime(gem.period_end), y=gem.tokens, name="Gemini API", mode="lines+markers",
+                        line=dict(color="#5b8def", width=2.6))
+        plot(fig, 200, legend=False)
+        ui.note("위 표: 회사가 밝힌 AI 연환산 매출을 CAPEX 전체와 나눈 비율이라 AI 투자만의 회수율은 아닙니다. 연환산(최근 분기·월 기준)과 "
+                "12개월 합을 비교해 기준이 다르고, Microsoft는 2026년 9월 분기부터 이 수치를 내지 않습니다. "
+                "아래 선: Google이 밝힌 Gemini API 처리량(분당 10억 토큰, 근사값)으로, 사용량이지 매출은 아닙니다.")
+    with e4:
+        st.markdown("**AI 모델 토큰 가격** (OpenRouter 게시가격, 출력 100만 토큰당 달러)")
+        fig = go.Figure()
+        if tnm is not None and len(tnm):
+            fig.add_bar(x=tnm.month, y=tnm.median_completion, name="출시 월별 모델 가격 중앙값", marker_color="#8a99a3",
+                        customdata=tnm.models, hovertemplate="%{y:.2f}달러 · 모델 %{customdata}개<extra></extra>")
+        if tpi is not None and len(tpi) > 1:
+            fig.add_scatter(x=tpi.fetched, y=tpi["index"], name="같은 모델 가격 지수(오른쪽)", yaxis="y2", mode="lines",
+                            line=dict(color="#f97316", width=2.4))
+            fig.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False))
+        plot(fig, 280)
+        days = len(tpi) if tpi is not None else 0
+        ui.note(f"막대는 지금 목록에 남은 모델을 출시 월로 묶은 중앙값이라 생존 편향이 있습니다. 같은 모델 가격 지수는 기존 모델의 가격 인하만 재며 "
+                f"2026-11-18부터 매일 쌓습니다(현재 {days}일). OpenRouter를 거치는 API 정가라 시장 일부이고 대량 계약 할인은 빠집니다. 판정은 하지 않습니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
