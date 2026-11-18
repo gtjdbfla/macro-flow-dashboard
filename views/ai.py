@@ -8,6 +8,7 @@ import streamlit as st
 
 import ai_view
 import ui
+from src.ai import demand_quality
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
 meta = load("views/meta.json")
@@ -91,7 +92,7 @@ g10_txt = f"{g10.spread_bp.iloc[0]:.0f}→{g10.spread_bp.iloc[-1]:.0f}bp" if len
 steps = [
     ("1 투자", "투자(CAPEX)", "warn" if B.capex_yoy > 0.5 else "mid",
      f"Big4 12개월 CAPEX <b>{B.capex_ttm/1e8:,.0f}억 달러</b><br>전년 대비 <b>{pct(B.capex_yoy*100)}</b>"),
-    ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8"]),
+    ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8", "F16"]),
      f"위 회사별 공시 실적 참고<br>대만 핵심 8사 중 <b>{n_tw}사</b> 월매출 +20%↑"),
     ("3 이익·현금", "회수와 현금흐름", kind_of(["F1", "F2", "F14"]),
      f"매출 {pct(B.rev_yoy*100)} · 영업이익 {pct(B.opinc_yoy*100)}<br>FCF 전년 대비 <b>{B.fcf_chg/1e8:+,.0f}억 달러</b>"),
@@ -172,6 +173,37 @@ with d:
     crwv = issu[issu.ticker == "CRWV"].sort_values("filed")
     if len(crwv):
         ui.note('<p class="note">코어위브(하이일드) 신규 채권 쿠폰: ' + ", ".join(f"{r.coupon:.2f}% {r.currency}" for r in crwv.itertuples()) + "</p>")
+
+dq = load("results/ai_demand_quality.parquet")
+if dq is not None and "F16" in fl:
+    f16 = fl["F16"]
+    st.markdown("#### 수요의 질 — NVIDIA 매출은 현금으로 들어오나 " + badge(f16["level"], level_kind(f16["level"])), unsafe_allow_html=True)
+    st.markdown(f16["text"])
+    h = dq[dq.period_end >= "2023-01-01"]
+    q1, q2 = st.columns(2, gap="large")
+    with q1:
+        st.markdown("**매출채권 회수 기간(DSO, 일)과 현금 전환**")
+        fig = go.Figure()
+        fig.add_scatter(x=h.period_end, y=h.dso, name="DSO(일, 왼쪽)", mode="lines+markers", line=dict(color="#5b8def", width=2.4))
+        fig.add_scatter(x=h.period_end, y=h.cash_conv, name="영업현금흐름÷순이익(12개월, 오른쪽)", mode="lines+markers", yaxis="y2",
+                        line=dict(color="#22a55a", width=2.4))
+        fig.add_hline(y=demand_quality.CASH_CONV, yref="y2", line_dash="dot", line_color="#ee5555")
+        fig.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False))
+        plot(fig, 280)
+        ui.note("점선은 현금 전환 기준(0.8)입니다. DSO는 4분기 전보다 10일 이상 늘면 악화로 봅니다. 10-Q 제출 전 분기는 비어 있습니다.")
+    with q2:
+        st.markdown("**고객 지원성 약정** (억 달러, CFO 코멘터리)")
+        cm = pd.DataFrame([{"분기말": c.period, "보증 최대 노출": c.guarantees, "네오클라우드 약정": c.neocloud, "지분투자 약정": c.equity,
+                            "클라우드 서비스 약정": c.cloud_service, "참고: 공급 약정": c.supply, "참고: 미개시 리스": c.dc_leases,
+                            "원문": c.source} for c in demand_quality.COMMITMENTS])
+        ratio = dq.set_index("period_end").support_ratio
+        cm["약정 ÷ 12개월 매출"] = [ratio.get(pd.Timestamp(c.period)) for c in demand_quality.COMMITMENTS]
+        st.dataframe(cm, hide_index=True, width="stretch", column_config={
+            "원문": st.column_config.LinkColumn(display_text="보기"),
+            "약정 ÷ 12개월 매출": st.column_config.NumberColumn(format="percent")})
+        ui.note("보증·네오클라우드·지분투자·클라우드 서비스 약정만 고객 금융으로 더합니다. 보증은 공시된 최대 노출이며 "
+                "SB Energy(OpenAI 전용 부지) 1,050억 달러는 2029 회계연도부터 단계적으로 발효됩니다. "
+                "공급 약정과 리스는 NVIDIA 자신의 지출이라 참고로만 표시합니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────

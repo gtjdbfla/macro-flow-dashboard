@@ -39,6 +39,9 @@ INSTANT_TAGS = {
     "cash_sti": ["CashCashEquivalentsAndShortTermInvestments", "CashCashEquivalentsAndMarketableSecurities"],
     "op_lease": ["OperatingLeaseLiability"],
     "fin_lease": ["FinanceLeaseLiability"],
+    # 수요의 질(F16, 2026-11-18): NVIDIA DSO·재고
+    "ar": ["AccountsReceivableNetCurrent"],
+    "inventory": ["InventoryNet"],
     "debt_due_12m": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths"],
     "debt_y2": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo"],
     "debt_y3": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree"],
