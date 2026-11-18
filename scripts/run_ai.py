@@ -12,6 +12,7 @@ from src.ai import forecast as FC  # noqa: E402
 from src.ai import safety as SF  # noqa: E402
 from src.ai import credit as CR  # noqa: E402
 from src.ai import demand_quality as DQ  # noqa: E402
+from src.ai import end_demand as ED  # noqa: E402
 from src.ai import gpu as GP  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
@@ -80,7 +81,12 @@ if (PARQUET / "gpu_rental.parquet").exists():
 sec = pd.read_parquet(PARQUET / "sec_quarterly.parquet")
 dq = DQ.table(sec)
 dq.reset_index(names="period_end").to_parquet(out / "ai_demand_quality.parquet")
-fl = sorted(fl + C.flags(ch, tw) + cr_fl + s_fl + gpu_fl + DQ.flags(dq), key=lambda f: int(f["id"][1:]))
+ramp = ED.ramp()
+sw, sw_hist = ED.software(sec)
+ramp.reset_index(names="date").to_parquet(out / "ai_end_ramp.parquet")
+sw.to_parquet(out / "ai_end_software.parquet")
+sw_hist.to_parquet(out / "ai_end_software_history.parquet")
+fl = sorted(fl + C.flags(ch, tw) + cr_fl + s_fl + gpu_fl + DQ.flags(dq) + ED.flags(ramp, sw), key=lambda f: int(f["id"][1:]))
 (out / "ai_flags.json").write_text(json.dumps({"flags": fl, "latest_filed": str(sec["filed"].max().date())},
                                               ensure_ascii=False, indent=1), encoding="utf-8")
 ev = ai_capex_event.run()

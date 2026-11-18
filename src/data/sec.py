@@ -14,6 +14,10 @@ from . import PARQUET
 UA = {"User-Agent": "macro-flow-dashboard research gtjdbfla@gmail.com"}
 CIKS = {"MSFT": "0000789019", "GOOGL": "0001652044", "AMZN": "0001018724", "META": "0001326801",
         "ORCL": "0001341439", "CRWV": "0001769628", "NVDA": "0001045810"}
+# F18 소프트웨어 AI 매출화 바스켓(2026-11-18 사전 고정, docs/AI_PROFITABILITY.md). 상장폐지·합병이 아니면 바꾸지 않는다.
+SOFTWARE = {"CRM": "0001108524", "NOW": "0001373715", "ADBE": "0000796343", "INTU": "0000896878", "PLTR": "0001321655",
+            "WDAY": "0001327811", "SNOW": "0001640147", "DDOG": "0001561550", "MDB": "0001441816", "HUBS": "0001404655"}
+CIKS = {**CIKS, **SOFTWARE}
 FLOW_TAGS = {
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
               "PaymentsForCapitalImprovements"],
@@ -22,6 +26,8 @@ FLOW_TAGS = {
                 "RevenueFromContractWithCustomerIncludingAssessedTax"],
     "op_income": ["OperatingIncomeLoss"],
     "net_income": ["NetIncomeLoss"],
+    "cost_rev": ["CostOfRevenue", "CostOfGoodsAndServicesSold"],
+    "gross_profit": ["GrossProfit"],
     "da": ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
            "DepreciationAndAmortization", "Depreciation"],
     "buyback": ["PaymentsForRepurchaseOfCommonStock"],

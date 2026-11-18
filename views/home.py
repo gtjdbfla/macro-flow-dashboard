@@ -63,7 +63,7 @@ B = latest[latest.ticker == "BIG4"].iloc[0]
 cloud_latest = load("results/ai_cloud_latest.parquet")
 cloud_tiles = ai_view.demand_tiles(cloud_latest)
 fl = {f["id"]: f for f in flags}
-demand = [i for i in ("F4", "F6", "F7", "F8", "F16") if i in fl]
+demand = [i for i in ("F4", "F6", "F7", "F8", "F16", "F17", "F18") if i in fl]
 press = [i for i in ("F1", "F2", "F3", "F9", "F10", "F11", "F12", "F13", "F14") if i in fl]
 n_good = sum(level_kind(fl[i]["level"]) == "good" for i in demand)
 n_bad = sum(level_kind(fl[i]["level"]) in ("bad", "warn") for i in press)

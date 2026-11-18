@@ -92,7 +92,7 @@ g10_txt = f"{g10.spread_bp.iloc[0]:.0f}→{g10.spread_bp.iloc[-1]:.0f}bp" if len
 steps = [
     ("1 투자", "투자(CAPEX)", "warn" if B.capex_yoy > 0.5 else "mid",
      f"Big4 12개월 CAPEX <b>{B.capex_ttm/1e8:,.0f}억 달러</b><br>전년 대비 <b>{pct(B.capex_yoy*100)}</b>"),
-    ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8", "F16"]),
+    ("2 수요", "클라우드·공급망", kind_of(["F4", "F6", "F7", "F8", "F16", "F17", "F18"]),
      f"위 회사별 공시 실적 참고<br>대만 핵심 8사 중 <b>{n_tw}사</b> 월매출 +20%↑"),
     ("3 이익·현금", "회수와 현금흐름", kind_of(["F1", "F2", "F14"]),
      f"매출 {pct(B.rev_yoy*100)} · 영업이익 {pct(B.opinc_yoy*100)}<br>FCF 전년 대비 <b>{B.fcf_chg/1e8:+,.0f}억 달러</b>"),
@@ -235,6 +235,31 @@ if dq is not None and "F16" in fl:
         plot(fig, 280)
         ui.note("AI 수익성이 아래로 퍼지면 NVIDIA 마진은 내려오고 클라우드 마진은 올라오는 모습이 됩니다. NVIDIA는 회사 전체, "
                 "AWS·Google Cloud는 부문 영업이익률이며 회계 분기말이 다릅니다. NVIDIA 최신 분기는 10-Q 제출 후 표시됩니다.")
+
+ramp = load("results/ai_end_ramp.parquet")
+sw = load("results/ai_end_software.parquet")
+if ramp is not None and sw is not None and "F17" in fl and "F18" in fl:
+    st.markdown("#### 최종 수요 — 기업이 AI에 돈을 내는가 " + badge(fl["F17"]["level"], level_kind(fl["F17"]["level"]))
+                + badge(fl["F18"]["level"], level_kind(fl["F18"]["level"])), unsafe_allow_html=True)
+    st.markdown(f'**F17 도입** · {fl["F17"]["text"]}  \n**F18 매출화** · {fl["F18"]["text"]}')
+    e1, e2 = st.columns(2, gap="large")
+    with e1:
+        st.markdown("**AI에 지출한 미국 기업 비율** (Ramp AI Index, %)")
+        fig = go.Figure()
+        for name, col, w in [("전체", "#22a55a", 2.8), ("소기업", "#8a99a3", 1.6), ("중견기업", "#5b8def", 1.6), ("대기업", "#f97316", 1.6)]:
+            if name in ramp:
+                fig.add_scatter(x=ramp.date, y=ramp[name] * 100, name=name, mode="lines", line=dict(color=col, width=w))
+        plot(fig, 280)
+        ui.note("Ramp 고객 8.5만여 곳의 카드·청구서 거래에서 AI 모델·구독·API 지출이 있는 기업 비율입니다. 지출 여부만 재고 금액은 아닙니다. "
+                "Ramp가 2026년 10월 방법을 바꿔 과거 값을 소급 수정했고, 화면과 판정 모두 최신 공표본 하나를 씁니다.")
+    with e2:
+        st.markdown("**AI 기능을 파는 소프트웨어 10곳** (회사별 최신 분기)")
+        tb = pd.DataFrame({"회사": sw.name, "분기말": pd.to_datetime(sw.quarter_end).dt.strftime("%Y-%m-%d"),
+                           "매출 전년비": sw.yoy * 100, "1년 전": sw.yoy_prev * 100, "가속도(%p)": sw.accel * 100,
+                           "매출총이익률": sw.gm * 100, "마진 변화(%p)": sw.gm_chg * 100})
+        st.dataframe(tb.round(1), hide_index=True, width="stretch", height=390)
+        ui.note("가속도는 매출 전년비가 1년 전보다 얼마나 빨라졌는지입니다. 마진 하락은 AI 추론 비용 부담을 뜻할 수 있습니다. "
+                "Intuit·Workday는 표준 매출원가 공시가 없어 마진이 비어 있습니다. 바스켓은 재무를 보기 전에 고정했고 AI 이외의 요인도 섞입니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────

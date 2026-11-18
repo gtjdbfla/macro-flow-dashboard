@@ -42,6 +42,9 @@ FRED_VINTAGE = {
     "UNRATE": "Unemployment", "PAYEMS": "Nonfarm Payroll", "GDPC1": "Real GDP",
     "INDPRO": "Industrial Production", "M2SL": "M2", "ICSA": "Initial Claims",
     "RSAFS": "Retail Sales", "DGORDER": "Durable Goods Orders",
+    # Ramp AI Index(F17): 미국 기업 중 AI에 지출한 비율, 2026-10 FRED 추가
+    "RAMPAIALL": "Ramp AI adoption", "RAMPAISMB": "Ramp AI adoption small", "RAMPAIMIDMARKET": "Ramp AI adoption mid",
+    "RAMPAIENTERPRISE": "Ramp AI adoption large",
 }
 
 # CFTC TFF(Futures Only) 계약 코드
