@@ -9,7 +9,7 @@ import streamlit as st
 import ai_view
 import ui
 from src.ai import demand_quality
-from src.ai import end_demand
+from src.ai import end_demand, holdings
 from src.ai.end_demand import GEMINI_TOKENS as ED_TOKENS
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
@@ -339,11 +339,18 @@ if hf is not None and hp is not None:
                 "SK하이닉스와 한국 전력·광통신 종목은 SEC 재무가 없어 주가만 표시합니다.")
     with h2:
         st.markdown("**주가는 지금 어디에 있나** (52주 고점 대비 · 최근 수익률)")
-        pt = pd.DataFrame({"종목": hp.name, "고점 대비%": hp.dd_52w * 100, "1개월%": hp.ret_1m * 100, "3개월%": hp.ret_3m * 100})
-        st.dataframe(pt.sort_values("고점 대비%").round(1), hide_index=True, width="stretch", height=480)
-        ui.note(f"기준일 {pd.to_datetime(hp.last_date).max():%Y-%m-%d}. 수정주가 종가, 거래일 기준입니다. "
+        pt = pd.DataFrame({"보유": np.where(hp.owned, "★", ""), "종목": hp.name, "고점 대비%": hp.dd_52w * 100, "1개월%": hp.ret_1m * 100,
+                           "3개월%": hp.ret_3m * 100})
+        st.dataframe(pt.sort_values(["보유", "고점 대비%"], ascending=[False, True]).round(1), hide_index=True, width="stretch", height=480)
+        ui.note(f"★는 직접 보유한다고 알려주신 종목입니다. 기준일 {pd.to_datetime(hp.last_date).max():%Y-%m-%d}. 수정주가 종가, 거래일 기준입니다. "
                 "실적은 좋아지는데 주가가 크게 내려 있다는 것은, 시장이 지금의 실적보다 앞으로의 투자 지속성이나 조달 위험을 보고 있을 가능성을 뜻합니다. "
                 "이유를 이 표만으로 단정할 수는 없습니다.")
+
+    with st.expander("Fermi — 확인된 사실 (10-Q 2026-09-30)"):
+        fm = pd.DataFrame(holdings.FERMI_FACTS, columns=["기준", "항목", "내용"])
+        st.dataframe(fm, hide_index=True, width="stretch")
+        st.markdown(f"[Fermi 10-Q 원문]({holdings.FERMI_10Q})")
+        st.caption("다른 보유 종목과 달리 매출이 없는 개발 단계 회사입니다. 업종 신호보다 임차인 계약, 자금 조달, 토지 임대 착공 통지 기한 같은 개별 사건이 중요합니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────

@@ -70,4 +70,5 @@ KR_SECTOR_STOCKS = {
 }
 
 # 보유 업종 점검용 주가(2026-11-19). 한국 전력·광통신 종목은 사용자가 보유 종목을 알려주면 추가한다.
-HOLDINGS_PX = ["NVDA", "000660.KS", "MU", "LITE", "COHR", "CIEN", "GLW", "FN", "CRDO", "ANET", "VRT", "GEV", "ETN", "PWR", "HUBB"]
+HOLDINGS_PX = ["NVDA", "000660.KS", "MU", "LITE", "COHR", "CIEN", "GLW", "FN", "CRDO", "ANET", "VRT", "GEV", "ETN", "PWR", "HUBB",
+               "0173Y0.KS", "AIPO", "BE", "FRMI"]

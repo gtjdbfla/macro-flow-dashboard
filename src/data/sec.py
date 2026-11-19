@@ -22,7 +22,9 @@ MEMORY = {"MU": "0000723125"}
 OPTICAL = {"LITE": "0001633978", "COHR": "0000820318", "CIEN": "0000936395", "GLW": "0000024741", "FN": "0001408710",
            "CRDO": "0001807794", "ANET": "0001596532"}
 POWER = {"VRT": "0001674101", "GEV": "0001996810", "ETN": "0001551182", "PWR": "0001050915", "HUBB": "0000048898"}
-CIKS = {**CIKS, **SOFTWARE, **MEMORY, **OPTICAL, **POWER}
+# 사용자 보유 개별 종목(2026-11-19). 업종 바스켓과 별도로 표시만 한다.
+OWNED = {"BE": "0001664703", "FRMI": "0002071778"}
+CIKS = {**CIKS, **SOFTWARE, **MEMORY, **OPTICAL, **POWER, **OWNED}
 FLOW_TAGS = {
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
               "PaymentsForCapitalImprovements"],
