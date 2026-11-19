@@ -33,24 +33,28 @@ def _year_ago(index, end):
 
 
 def software(sec, as_of=None):
+    return basket(sec, SOFTWARE, NAMES, as_of)
+
+
+def basket(sec, tickers, names, as_of=None):
     """회사별 최신 분기의 매출 전년비, 4분기 전 전년비, 가속도, 매출총이익률과 전년 대비 변화."""
     as_of = pd.Timestamp(as_of or pd.Timestamp.now().normalize())
-    d = sec.loc[sec.ticker.isin(SOFTWARE) & sec.metric.isin(["revenue", "cost_rev", "gross_profit"]) & (sec.filed <= as_of)]
+    d = sec.loc[sec.ticker.isin(tickers) & sec.metric.isin(["revenue", "cost_rev", "gross_profit"]) & (sec.filed <= as_of)]
     d = d.sort_values("filed").drop_duplicates(["ticker", "end", "metric"], keep="first")
     rows, hist = [], []
-    for ticker in SOFTWARE:
+    for ticker in tickers:
         q = d[d.ticker == ticker].pivot(index="end", columns="metric", values="value")
         q = q.reindex(columns=["revenue", "cost_rev", "gross_profit"]).sort_index()
         q = q[q.revenue > 0]
         if q.empty:
-            rows.append({"ticker": ticker, "name": NAMES[ticker]})
+            rows.append({"ticker": ticker, "name": names[ticker]})
             continue
         gm = (q.gross_profit / q.revenue).fillna(1 - q.cost_rev / q.revenue)
         yoy = pd.Series({end: q.at[end, "revenue"] / q.at[prior, "revenue"] - 1
                          for end in q.index if (prior := _year_ago(q.index, end)) is not None}, dtype=float)
         hist += [{"ticker": ticker, "quarter_end": end, "yoy": v} for end, v in yoy.items()]
         end = q.index[-1]
-        row = {"ticker": ticker, "name": NAMES[ticker], "quarter_end": end, "recent": (as_of - end).days <= RECENT_DAYS,
+        row = {"ticker": ticker, "name": names[ticker], "quarter_end": end, "recent": (as_of - end).days <= RECENT_DAYS,
                "yoy": yoy.get(end), "gm": gm.get(end)}
         prior = _year_ago(q.index, end)
         if prior is not None:

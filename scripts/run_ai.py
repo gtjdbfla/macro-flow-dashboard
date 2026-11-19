@@ -13,6 +13,7 @@ from src.ai import safety as SF  # noqa: E402
 from src.ai import credit as CR  # noqa: E402
 from src.ai import demand_quality as DQ  # noqa: E402
 from src.ai import end_demand as ED  # noqa: E402
+from src.ai import holdings as HD  # noqa: E402
 from src.ai import gpu as GP  # noqa: E402
 from src.ai import metrics as M  # noqa: E402
 from src.data import DATA_DIR, PARQUET  # noqa: E402
@@ -86,6 +87,8 @@ sw, sw_hist = ED.software(sec)
 ramp.reset_index(names="date").to_parquet(out / "ai_end_ramp.parquet")
 sw.to_parquet(out / "ai_end_software.parquet")
 sw_hist.to_parquet(out / "ai_end_software_history.parquet")
+HD.fundamentals(sec).to_parquet(out / "ai_holdings_fundamentals.parquet")
+HD.prices().to_parquet(out / "ai_holdings_prices.parquet")
 ED.ai_revenue_coverage(pd.read_parquet(out / "ai_history.parquet")).to_parquet(out / "ai_end_revenue_coverage.parquet")
 if (PARQUET / "token_prices.parquet").exists():
     tp = pd.read_parquet(PARQUET / "token_prices.parquet")

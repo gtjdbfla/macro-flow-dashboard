@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("MACRO_DATA_DIR", ROOT / "data"))
 PARQ = DATA / "parquet"
 PY = sys.executable
-COLLECT = {"us": ["yahoo", "cftc", "fred", "ssga", "sec", "cloud", "debt", "gpurent", "tokenprice"], "kr": ["yahoo_kr", "kis", "kis_stocks"],
+COLLECT = {"us": ["yahoo", "yahoo_ai", "cftc", "fred", "ssga", "sec", "cloud", "debt", "gpurent", "tokenprice"], "kr": ["yahoo_kr", "kis", "kis_stocks"],
            "filings": ["sec", "cloud", "debt"], "weekly": ["french"]}
 FEATURES = ("build_features", ["scripts/build_features.py"], True, 900)
 BACKTESTS = ("run_backtests", ["scripts/run_backtests.py"], False, 900)

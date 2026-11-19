@@ -83,3 +83,13 @@ def test_anthropic_quarters_ratios_and_totals():
     nine_months = q.loc["2026-01-01":"2026-09-30"]
     assert nine_months.revenue.sum() == 33242          # S-1 요약표의 2026년 1~9월 매출
     assert nine_months.op_income.sum() == -1260        # S-1 요약표의 2026년 1~9월 영업손실
+
+
+def test_holdings_rpo_yoy_and_basket_names():
+    from src.ai import holdings as hd
+    ends = pd.to_datetime(["2025-09-30", "2026-09-30"])
+    rows = [("VRT", e, "rpo", v, e + pd.Timedelta(days=30)) for e, v in zip(ends, [100.0, 150.0])]
+    sec = pd.DataFrame(rows, columns=["ticker", "end", "metric", "value", "filed"])
+    assert hd._rpo_yoy(sec, "VRT", pd.Timestamp("2026-11-19")) == pytest.approx(0.5)
+    assert hd._rpo_yoy(sec, "ETN", pd.Timestamp("2026-11-19")) is None
+    assert set(hd.NAMES) >= {t for _, g in hd.GROUPS for t in g}

@@ -321,6 +321,30 @@ if ramp is not None and sw is not None and "F17" in fl and "F18" in fl:
         ui.note("F10은 신규 발행 쿠폰(9.625%)만 봐서 유통시장에서의 스트레스를 반영하지 못합니다. 아래 수치는 CNBC가 Deutsche Bank를 인용해 보도한 값을 "
                 "원문에서 확인해 옮겼으며, 매일 점검 루틴이 새 보도를 확인해 갱신합니다. 같은 보도에 따르면 NVIDIA CDS 약 139bp, Oracle 약 298bp입니다.")
 
+hf = load("results/ai_holdings_fundamentals.parquet")
+hp = load("results/ai_holdings_prices.parquet")
+if hf is not None and hp is not None:
+    st.markdown("#### 내 보유 업종 점검 — 메모리 · 광통신 · 전력 인프라")
+    st.caption("네 업종(NVIDIA·메모리·광통신·전력)은 모두 빅테크·네오클라우드의 AI 투자에서 나오는 수요라서, 같은 신호(F1~F4, F9~F11, F16)에 함께 노출됩니다. "
+               "표시만 하며 종합 등급은 만들지 않습니다.")
+    h1, h2 = st.columns([1.35, 1], gap="large")
+    with h1:
+        st.markdown("**회사별 최신 분기 실적** (SEC 공시)")
+        ft = pd.DataFrame({"업종": hf.group, "회사": hf.name, "분기말": pd.to_datetime(hf.quarter_end).dt.strftime("%Y-%m-%d"),
+                           "매출 전년비%": hf.yoy * 100, "가속도(%p)": hf.accel * 100, "매출총이익률%": hf.gm * 100,
+                           "마진 변화(%p)": hf.gm_chg * 100, "수주잔고 전년비%": hf.rpo_yoy * 100})
+        st.dataframe(ft.round(1), hide_index=True, width="stretch", height=480)
+        ui.note("가속도는 매출 전년비가 1년 전보다 얼마나 빨라졌는지입니다. Micron 매출총이익률은 메모리 가격의 대용으로 SK하이닉스 실적보다 먼저 나옵니다. "
+                "수주잔고(RPO)는 공시하는 회사만 표시합니다. 회계 분기말이 서로 달라 단순 비교는 조심해야 합니다. "
+                "SK하이닉스와 한국 전력·광통신 종목은 SEC 재무가 없어 주가만 표시합니다.")
+    with h2:
+        st.markdown("**주가는 지금 어디에 있나** (52주 고점 대비 · 최근 수익률)")
+        pt = pd.DataFrame({"종목": hp.name, "고점 대비%": hp.dd_52w * 100, "1개월%": hp.ret_1m * 100, "3개월%": hp.ret_3m * 100})
+        st.dataframe(pt.sort_values("고점 대비%").round(1), hide_index=True, width="stretch", height=480)
+        ui.note(f"기준일 {pd.to_datetime(hp.last_date).max():%Y-%m-%d}. 수정주가 종가, 거래일 기준입니다. "
+                "실적은 좋아지는데 주가가 크게 내려 있다는 것은, 시장이 지금의 실적보다 앞으로의 투자 지속성이나 조달 위험을 보고 있을 가능성을 뜻합니다. "
+                "이유를 이 표만으로 단정할 수는 없습니다.")
+
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
 if slt is not None:

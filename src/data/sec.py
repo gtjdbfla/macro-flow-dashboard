@@ -17,7 +17,12 @@ CIKS = {"MSFT": "0000789019", "GOOGL": "0001652044", "AMZN": "0001018724", "META
 # F18 소프트웨어 AI 매출화 바스켓(2026-11-18 사전 고정, docs/AI_PROFITABILITY.md). 상장폐지·합병이 아니면 바꾸지 않는다.
 SOFTWARE = {"CRM": "0001108524", "NOW": "0001373715", "ADBE": "0000796343", "INTU": "0000896878", "PLTR": "0001321655",
             "WDAY": "0001327811", "SNOW": "0001640147", "DDOG": "0001561550", "MDB": "0001441816", "HUBS": "0001404655"}
-CIKS = {**CIKS, **SOFTWARE}
+# 보유 업종 점검 바스켓(2026-11-19 사전 고정, docs/AI_PROFITABILITY.md): 메모리·광통신·전력.
+MEMORY = {"MU": "0000723125"}
+OPTICAL = {"LITE": "0001633978", "COHR": "0000820318", "CIEN": "0000936395", "GLW": "0000024741", "FN": "0001408710",
+           "CRDO": "0001807794", "ANET": "0001596532"}
+POWER = {"VRT": "0001674101", "GEV": "0001996810", "ETN": "0001551182", "PWR": "0001050915", "HUBB": "0000048898"}
+CIKS = {**CIKS, **SOFTWARE, **MEMORY, **OPTICAL, **POWER}
 FLOW_TAGS = {
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
               "PaymentsForCapitalImprovements"],
