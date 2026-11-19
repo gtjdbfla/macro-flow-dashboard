@@ -74,3 +74,12 @@ def test_revenue_coverage_uses_same_quarter_capex():
                          "capex_ttm": [520e8, 740e8, 1000e8]})
     cov = ed.ai_revenue_coverage(hist).set_index(["ticker", "period_end"])
     assert cov.loc[("MSFT", pd.Timestamp("2026-03-31")), "coverage"] == pytest.approx(370 / 740)
+
+
+def test_anthropic_quarters_ratios_and_totals():
+    q = ed.anthropic_quarters().set_index("quarter_end")
+    assert q.loc["2026-09-30", "compute_ratio"] == pytest.approx(9863 / 16956)
+    assert q.loc["2026-06-30", "op_income"] > 0
+    nine_months = q.loc["2026-01-01":"2026-09-30"]
+    assert nine_months.revenue.sum() == 33242          # S-1 요약표의 2026년 1~9월 매출
+    assert nine_months.op_income.sum() == -1260        # S-1 요약표의 2026년 1~9월 영업손실

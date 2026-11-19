@@ -161,3 +161,38 @@ def new_model_prices(df):
     out = pd.DataFrame({"median_completion": g.completion.median(), "models": g.size()}).reset_index(names="month")
     out["month"] = out.month.dt.to_timestamp()
     return out[out.month >= "2024-01-01"]
+
+
+# Anthropic(S-1/A 3차, 2026-11-17 제출) 분기 실적. 금액 단위 백만 달러. 비상장 AI 연구소의 첫 1차 재무 공시라 판정 없이 표시만 한다.
+# 영업손익은 GAAP이고 주식 기반 보상 등이 들어간다. 상장 전 자료라 수정본에서 숫자가 바뀔 수 있다.
+ANTHROPIC_S1 = "https://www.sec.gov/Archives/edgar/data/2130357/000162828026074338/anthropicpbc-sx1ax3.htm"
+ANTHROPIC_QUARTERS = (
+    ("2025-03-31", 376, 944, -935), ("2025-06-30", 787, 1390, -1200), ("2025-09-30", 1382, 2047, -3089),
+    ("2025-12-31", 2040, 2945, -2836), ("2026-03-31", 4731, 3387, -1667), ("2026-06-30", 11555, 5558, 974),
+    ("2026-09-30", 16956, 9863, -567),
+)
+# 억 달러. 영업현금흐름은 2026-01~09 누적, 약정은 구매약정·리스(미개시 포함)로 거의 전부 컴퓨팅·인프라.
+ANTHROPIC_FACTS = (
+    ("2026-01~09 영업현금흐름", 66, "작년 같은 기간 -20억"),
+    ("2026-09-30 현금·단기투자", 1318.45, "상장 전 기준"),
+    ("컴퓨팅 등 약정 합계", 9009, "미개시 리스 포함"),
+    ("ㄴ 2030년 말까지 지출 예정", 4516, ""),
+    ("ㄴ 앞으로 12개월 안 지출 예정", 707, ""),
+)
+
+
+def anthropic_quarters():
+    d = pd.DataFrame(ANTHROPIC_QUARTERS, columns=["quarter_end", "revenue", "compute", "op_income"])
+    d["quarter_end"] = pd.to_datetime(d.quarter_end)
+    d["compute_ratio"] = d.compute / d.revenue
+    d["op_margin"] = d.op_income / d.revenue
+    return d
+
+
+# CoreWeave 유통시장 신용 스트레스(언론 보도, 일자별). F10은 신규 발행 쿠폰만 봐서 유통 수익률과 CDS를 반영하지 못한다.
+# CDS는 Deutsche Bank 인용(CNBC). 일자는 보도가 가리키는 거래일이다.
+CRWV_STRESS = (
+    ("2026-11-05", 1289, "5년 CDS(bp), 10월 고점 상회", "https://www.cnbc.com/2026/11/06/coreweave-bond-yield-tops-16percent-as-ai-credit-stress-rises.html"),
+    ("2026-11-06", 1155, "5년 CDS(bp), 전일 대비 -8%", "https://www.cnbc.com/2026/11/06/coreweave-bond-yield-tops-16percent-as-ai-credit-stress-rises.html"),
+    ("2026-11-06", 16, "2032년 만기 9.625% 채권 유통 수익률(%) 초과", "https://www.cnbc.com/2026/11/06/coreweave-bond-yield-tops-16percent-as-ai-credit-stress-rises.html"),
+)

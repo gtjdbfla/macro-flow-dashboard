@@ -9,6 +9,7 @@ import streamlit as st
 import ai_view
 import ui
 from src.ai import demand_quality
+from src.ai import end_demand
 from src.ai.end_demand import GEMINI_TOKENS as ED_TOKENS
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
@@ -296,6 +297,29 @@ if ramp is not None and sw is not None and "F17" in fl and "F18" in fl:
         days = len(tpi) if tpi is not None else 0
         ui.note(f"막대는 지금 목록에 남은 모델을 출시 월로 묶은 중앙값이라 생존 편향이 있습니다. 같은 모델 가격 지수는 기존 모델의 가격 인하만 재며 "
                 f"2026-11-18부터 매일 쌓습니다(현재 {days}일). OpenRouter를 거치는 API 정가라 시장 일부이고 대량 계약 할인은 빠집니다. 판정은 하지 않습니다.")
+
+    a1, a2 = st.columns(2, gap="large")
+    with a1:
+        st.markdown("**Anthropic은 돈을 벌고 있나** (S-1 분기 실적, 억 달러)")
+        aq = end_demand.anthropic_quarters()
+        fig = go.Figure()
+        fig.add_bar(x=aq.quarter_end, y=aq.revenue / 100, name="매출", marker_color="#5b8def")
+        fig.add_bar(x=aq.quarter_end, y=aq.compute / 100, name="컴퓨팅·인프라 비용", marker_color="#f97316")
+        fig.add_scatter(x=aq.quarter_end, y=aq.compute_ratio * 100, name="비용 ÷ 매출(%, 오른쪽)", yaxis="y2", mode="lines+markers",
+                        line=dict(color="#8a99a3", width=2))
+        fig.update_layout(barmode="group", yaxis2=dict(overlaying="y", side="right", showgrid=False, range=[0, 160]))
+        plot(fig, 280)
+        facts = pd.DataFrame(end_demand.ANTHROPIC_FACTS, columns=["항목", "억 달러", "비고"])
+        st.dataframe(facts, hide_index=True, width="stretch", column_config={"억 달러": st.column_config.NumberColumn(format="%,.0f")})
+        st.markdown(f"[S-1/A 원문 (2026-11-17)]({end_demand.ANTHROPIC_S1})")
+        ui.note("AI 연구소 중 처음으로 1차 재무가 공개됐습니다. GAAP 영업손익은 2026년 2분기 +9.7억, 3분기 -5.7억으로 손익분기 부근입니다. "
+                "상장 전 자료라 수정본에서 숫자가 바뀔 수 있고, OpenAI 등 다른 연구소는 공시가 없어 이 한 곳이 AI 연구소 전체를 대표하지는 않습니다. 판정은 하지 않습니다.")
+    with a2:
+        st.markdown("**CoreWeave 유통시장 신용 스트레스** (언론 보도, 판정 없음)")
+        cs = pd.DataFrame(end_demand.CRWV_STRESS, columns=["일자", "수치", "내용", "출처"])
+        st.dataframe(cs, hide_index=True, width="stretch", column_config={"출처": st.column_config.LinkColumn(display_text="보기")})
+        ui.note("F10은 신규 발행 쿠폰(9.625%)만 봐서 유통시장에서의 스트레스를 반영하지 못합니다. 아래 수치는 CNBC가 Deutsche Bank를 인용해 보도한 값을 "
+                "원문에서 확인해 옮겼으며, 매일 점검 루틴이 새 보도를 확인해 갱신합니다. 같은 보도에 따르면 NVIDIA CDS 약 139bp, Oracle 약 298bp입니다.")
 
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
