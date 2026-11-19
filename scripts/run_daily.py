@@ -31,6 +31,7 @@ BACKTESTS = ("run_backtests", ["scripts/run_backtests.py"], False, 900)
 AI = ("run_ai", ["scripts/run_ai.py"], False, 600)
 SCORING = ("run_scoring", ["scripts/run_scoring.py"], True, 900)
 RISK = ("run_risk", ["scripts/run_risk.py"], False, 300)
+GUIDE = ("run_guide", ["scripts/run_guide.py"], False, 120)
 VIEWS = ("build_views", ["scripts/build_views.py"], True, 300)
 
 
@@ -124,14 +125,15 @@ def freshness():
 
 
 def backup_ledger():
-    src = DATA / "ledger" / "ledger.jsonl"
-    if not src.exists():
-        return
     d = DATA / "backups"
     d.mkdir(exist_ok=True)
-    shutil.copy2(src, d / f"ledger_{now():%Y%m%d}.jsonl")
-    for old in sorted(d.glob("ledger_*.jsonl"))[:-30]:
-        old.unlink()
+    for name in ("ledger", "guide"):
+        src = DATA / "ledger" / f"{name}.jsonl"
+        if not src.exists():
+            continue
+        shutil.copy2(src, d / f"{name}_{now():%Y%m%d}.jsonl")
+        for old in sorted(d.glob(f"{name}_*.jsonl"))[:-30]:
+            old.unlink()
 
 
 def trim_log():
@@ -171,12 +173,12 @@ def main():
     # 2) 분석 단계 선택
     if mode == "filings":
         changed = filings_snapshot() != before
-        pipeline = [RISK, AI, SCORING, VIEWS] if changed else []
+        pipeline = [RISK, AI, SCORING, GUIDE, VIEWS] if changed else []
         steps.append({"name": "새 공시 확인", "ok": True, "seconds": 0, "tail": "새 공시 있음 -> 분석 갱신" if changed else "새 공시 없음"})
     elif mode == "weekly":
-        pipeline = [RISK, FEATURES, BACKTESTS, AI, SCORING, VIEWS]
+        pipeline = [RISK, FEATURES, BACKTESTS, AI, SCORING, GUIDE, VIEWS]
     else:
-        pipeline = [RISK, FEATURES, AI, SCORING, VIEWS]
+        pipeline = [RISK, FEATURES, AI, SCORING, GUIDE, VIEWS]
         if not (DATA / "results" / "regime_backtest.parquet").exists():
             pipeline.insert(2, BACKTESTS)
     for name, cmd, critical, tmo in pipeline:
