@@ -352,6 +352,28 @@ if hf is not None and hp is not None:
         st.markdown(f"[Fermi 10-Q 원문]({holdings.FERMI_10Q})")
         st.caption("다른 보유 종목과 달리 매출이 없는 개발 단계 회사입니다. 업종 신호보다 임차인 계약, 자금 조달, 토지 임대 착공 통지 기한 같은 개별 사건이 중요합니다.")
 
+guide_ = load("results/ai_guide.json")
+if guide_ and guide_.get("snapshot", {}).get("bubble"):
+    bb = guide_["snapshot"]["bubble"]
+    mark = {True: "예", False: "아니오", None: "판정 불가"}
+    n_ok = sum(i["ok"] is True for i in bb["resolution"])
+    n_w = sum(i["ok"] is True for i in bb["warning"])
+    st.markdown(f"#### 거품론 점검표 — 해소 조건 {n_ok}/{len(bb['resolution'])} 충족 · 악화 신호 {n_w}/{len(bb['warning'])} 발생")
+    st.caption("거품론이 풀리려면 무엇이 확인돼야 하는지(해소 조건)와 거품론이 맞았음을 알리는 신호(악화 신호)를 매주 같은 틀로 점검합니다. "
+               "점검 목록이며 합계에 예측력이 있다고 주장하지 않습니다. 정책 불확실성(연준·데이터센터 규제·칩 수출 규제)은 자동 판정하지 않고 주간 브리핑이 뉴스로 답합니다.")
+    groups = {"A": "A 현금 회수", "B": "B 최종 수요", "C": "C 금융", "D": "D 시장 안정(가격)"}
+    rt = pd.DataFrame([{"묶음": groups[i["group"]], "조건": i["text"], "충족": mark[i["ok"]], "근거": i["detail"]} for i in bb["resolution"]])
+    wt = pd.DataFrame([{"신호": i["text"], "발생": mark[i["ok"]], "근거": i["detail"]} for i in bb["warning"]])
+    k1, k2 = st.columns([1.5, 1], gap="large")
+    with k1:
+        st.markdown("**해소 조건**")
+        st.dataframe(rt, hide_index=True, width="stretch", height=590)
+    with k2:
+        st.markdown("**악화 신호** (예 = 발생)")
+        st.dataframe(wt, hide_index=True, width="stretch", height=240)
+        ui.note("기준은 현재 값(대부분 악화 방향)을 이미 안 상태에서 정했습니다. 그래서 지금 대부분 '아니오'인 것은 예정된 결과입니다. "
+                "판정 불가는 자료가 오래돼서 판단을 미룬 항목입니다.")
+
 
 # ── 안전성(신용) ───────────────────────────────────────────────────────────
 if slt is not None:
