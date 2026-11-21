@@ -311,7 +311,7 @@ if ramp is not None and sw is not None and "F17" in fl and "F18" in fl:
         plot(fig, 280)
         facts = pd.DataFrame(end_demand.ANTHROPIC_FACTS, columns=["항목", "억 달러", "비고"])
         st.dataframe(facts, hide_index=True, width="stretch", column_config={"억 달러": st.column_config.NumberColumn(format="%,.0f")})
-        st.markdown(f"[S-1/A 원문 (2026-11-17)]({end_demand.ANTHROPIC_S1})")
+        st.markdown(f"[최종 투자설명서 424B4 원문 (2026-11-19)]({end_demand.ANTHROPIC_S1})")
         ui.note("AI 연구소 중 처음으로 1차 재무가 공개됐습니다. GAAP 영업손익은 2026년 2분기 +9.7억, 3분기 -5.7억으로 손익분기 부근입니다. "
                 "상장 전 자료라 수정본에서 숫자가 바뀔 수 있고, OpenAI 등 다른 연구소는 공시가 없어 이 한 곳이 AI 연구소 전체를 대표하지는 않습니다. 판정은 하지 않습니다.")
     with a2:
