@@ -34,6 +34,8 @@ FRED_DAILY = {
     "T10YIE": "10Y Breakeven", "T10Y2Y": "10Y-2Y", "BAMLH0A0HYM2": "HY OAS", "BAMLC0A0CM": "IG OAS",
     "DTWEXBGS": "Broad USD", "DCOILWTICO": "WTI", "NFCI": "Chicago FCI (weekly)",
     "WALCL": "Fed balance sheet (weekly)", "WTREGEN": "TGA (weekly)", "RRPONTSYD": "ON RRP",
+    # 조기경보 패널(2026-11-24): 정책금리 상단, 삼의 법칙(월), 실업수당 4주 평균(주)
+    "DFEDTARU": "Fed target upper", "SAHMREALTIME": "Sahm rule (monthly)", "IC4WSA": "Initial claims 4wk avg (weekly)",
 }
 # 신용등급대별 옵션조정스프레드(ICE BofA). FRED는 최근 3년만 제공. AI 차입자(Oracle=BBB급, CoreWeave=B~BB급)의 시장 금융환경을 본다.
 FRED_CREDIT = {"DGS5": "UST 5Y", "BAMLC0A4CBBB": "BBB OAS", "BAMLH0A1HYBB": "BB OAS", "BAMLH0A2HYB": "B OAS", "BAMLH0A3HYC": "CCC OAS"}
@@ -72,3 +74,6 @@ KR_SECTOR_STOCKS = {
 # 보유 업종 점검용 주가(2026-11-19). 한국 전력·광통신 종목은 사용자가 보유 종목을 알려주면 추가한다.
 HOLDINGS_PX = ["NVDA", "000660.KS", "MU", "LITE", "COHR", "CIEN", "GLW", "FN", "CRDO", "ANET", "VRT", "GEV", "ETN", "PWR", "HUBB",
                "0173Y0.KS", "AIPO", "BE", "FRMI"]
+
+# 조기경보 패널용 가격(2026-11-24): USD/JPY(엔 캐리 청산), USD/KRW
+EW_PX = ["JPY=X", "KRW=X"]

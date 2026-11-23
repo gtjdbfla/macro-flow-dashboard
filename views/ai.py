@@ -352,6 +352,36 @@ if hf is not None and hp is not None:
         st.markdown(f"[Fermi 10-Q 원문]({holdings.FERMI_10Q})")
         st.caption("다른 보유 종목과 달리 매출이 없는 개발 단계 회사입니다. 업종 신호보다 임차인 계약, 자금 조달, 토지 임대 착공 통지 기한 같은 개별 사건이 중요합니다.")
 
+ew_ = load("results/ai_early_warning.json")
+if ew_:
+    dot = {"green": "🟢", "yellow": "🟡", "red": "🔴", "na": "⚪"}
+    st.markdown(f"#### 조기경보 패널 — 빨강 {ew_['red']} · 노랑 {ew_['yellow']} · 초록 {ew_['green']}")
+    st.caption("Threads 게시물(@_dplabs_)의 체크리스트 중 우리 데이터로 계산되는 지표입니다. 임계값은 게시물의 값이고 검증되지 않았습니다(표시 전용, 합계에 예측력 주장 없음). "
+               "규칙은 docs/AI_PROFITABILITY.md(2026-11-24 사전 등록).")
+    e1, e2 = st.columns([1.6, 1], gap="large")
+    with e1:
+        et = pd.DataFrame([{"": dot[i["level"]], "지표": i["name"], "상태": i["detail"], "기준일": i.get("asof") or ""} for i in ew_["indicators"]])
+        st.dataframe(et, hide_index=True, width="stretch", height=410)
+    with e2:
+        a = ew_.get("aux", {})
+        st.markdown("**보조 지표**")
+        if "vix" in a:
+            st.write(f"VIX {a['vix']['value']:.1f} · 25 이상 연속 {a['vix']['run_ge25']}일 · 30 이상 연속 {a['vix']['run_ge30']}일")
+        if "spx" in a:
+            x = a["spx"]
+            st.write(f"S&P 500: 50일선 대비 {x['pct_vs_50d']:+.1%} · 200일선 대비 {x['pct_vs_200d']:+.1%} · "
+                     f"{'50일선이 200일선 아래(데스크로스)' if x['death_cross'] else '50일선이 200일선 위'}")
+        if "nfci" in a:
+            st.write(f"시카고 연준 금융여건지수 {a['nfci']['value']:+.2f} (0보다 크면 평균보다 긴축)")
+        ui.note("지표별 기준일이 다릅니다. 코스피와 외국인 수급은 한국 장 마감 후 갱신돼 하루 늦을 수 있습니다. 미입력 항목(빅테크 CAPEX 가이던스)은 수기 입력이 필요합니다.")
+    st.markdown("**추세 상태판** — 200일선 아래 3거래일 연속 마감하면 '이탈', 위로 3거래일 연속이면 '복귀'")
+    tt = pd.DataFrame([{"보유": "★" if t["owned"] else "", "대상": t["name"], "상태": t["state"], "전환일": t.get("since") or "",
+                        "200일선 대비": None if t.get("pct_vs_200d") is None else round(t["pct_vs_200d"] * 100, 1),
+                        "아래 연속": t.get("run_below"), "위 연속": t.get("run_above")} for t in ew_["trend"]])
+    st.dataframe(tt, hide_index=True, width="stretch")
+    ui.note("규칙은 데이터 시작 시점에 '보유'로 시작해 전환일이 실제 거래 신호가 아닐 수 있습니다. 과거 백테스트에서 이런 규칙은 낙폭은 줄였지만 수익률을 높인다는 보장은 없습니다. "
+            "상장 200거래일 미만 종목은 '자료 부족'입니다.")
+
 guide_ = load("results/ai_guide.json")
 if guide_ and guide_.get("snapshot", {}).get("bubble"):
     bb = guide_["snapshot"]["bubble"]

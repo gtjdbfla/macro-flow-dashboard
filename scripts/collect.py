@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data import DATA_DIR, cftc, cloud, debt, fred, french, gpurent, sec, ssga, tokenprice, twse, yahoo  # noqa: E402
-from src.data.universe import CFTC, FRED_CREDIT, FRED_DAILY, FRED_VINTAGE, HOLDINGS_PX, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
+from src.data.universe import CFTC, EW_PX, FRED_CREDIT, FRED_DAILY, FRED_VINTAGE, HOLDINGS_PX, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
 cov_path = DATA_DIR / "coverage.json"
@@ -16,7 +16,7 @@ now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 if not only or "yahoo" in only:
     cov["yahoo"] = {"updated": now, "series": yahoo.collect(YAHOO)}
 if "yahoo_ai" in only:
-    cov["yahoo_ai"] = {"updated": now, "series": yahoo.collect(HOLDINGS_PX)}
+    cov["yahoo_ai"] = {"updated": now, "series": yahoo.collect(HOLDINGS_PX + EW_PX)}
 if "yahoo_kr" in only:
     cov["yahoo_kr"] = {"updated": now, "series": yahoo.collect(["^KS11"])}
 if not only or "cftc" in only:

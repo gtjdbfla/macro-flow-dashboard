@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd  # noqa: E402
 
+from src.ai import early_warning as EW  # noqa: E402
 from src.ai import guide as G  # noqa: E402
 from src.data import DATA_DIR  # noqa: E402
 
@@ -56,6 +57,14 @@ def _ctx():
 
 (DATA_DIR / "ledger").mkdir(exist_ok=True)
 snap = G.snapshot(pd.Timestamp.now().date(), risk, flags, big4, metrics, _ctx())
+try:
+    ew = EW.compute()
+    snap["early"] = EW.summary(ew)
+    (R / "ai_early_warning.json").write_text(json.dumps(ew, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    (R / "ai_early_warning.json").chmod(0o644)
+    print("guide: 조기경보 빨강", ew["red"], "노랑", ew["yellow"], "초록", ew["green"], "| 이탈", [t["ticker"] for t in ew["trend"] if t["state"] == "이탈"])
+except Exception as e:
+    print("guide: 조기경보 계산 실패", e)
 rows = G.append(DATA_DIR / "ledger" / "guide.jsonl", snap)
 out = {"snapshot": snap, "changes": G.compare(rows), "snapshots": len(rows)}
 tmp = R / "ai_guide.json.tmp"

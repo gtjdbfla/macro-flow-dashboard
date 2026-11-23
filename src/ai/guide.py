@@ -74,7 +74,7 @@ def compare(rows, min_days=SNAPSHOT_MIN_DAYS):
     older = [r for r in rows[:-1] if (pd.Timestamp(cur["date"]) - pd.Timestamp(r["date"])).days >= min_days]
     prev = older[-1] if older else (rows[0] if len(rows) > 1 else None)
     if prev is None:
-        return {"base": None, "flag_changes": [], "macro_changes": [], "checklist_changes": [], "market": {}, "bubble_changes": []}
+        return {"base": None, "flag_changes": [], "macro_changes": [], "checklist_changes": [], "market": {}, "bubble_changes": [], "early_changes": []}
     flag_changes = []
     for fid, lvl in cur["flags"].items():
         before = prev["flags"].get(fid)
@@ -101,7 +101,21 @@ def compare(rows, min_days=SNAPSHOT_MIN_DAYS):
             market[k] = {"from": b, "to": a}
     return {"base": prev["date"], "flag_changes": flag_changes, "macro_changes": macro_changes,
             "checklist_changes": checklist_changes, "market": market,
-            "bubble_changes": bubble_changes(cur.get("bubble") or {"resolution": [], "warning": []}, prev.get("bubble"))}
+            "bubble_changes": bubble_changes(cur.get("bubble") or {"resolution": [], "warning": []}, prev.get("bubble")),
+            "early_changes": early_changes(cur.get("early"), prev.get("early"))}
+
+
+def early_changes(cur, prev):
+    """조기경보 신호등과 추세 상태(보유/이탈)가 바뀐 항목."""
+    if not cur or not prev:
+        return []
+    out = []
+    for grp, key in (("levels", "지표"), ("trend", "추세")):
+        for k, v in cur.get(grp, {}).items():
+            b = prev.get(grp, {}).get(k)
+            if b is not None and b != v:
+                out.append({"kind": key, "id": k, "from": b, "to": v})
+    return out
 
 
 # ── 거품론 점검표(docs/AI_PROFITABILITY.md, 2026-11-20 사전 등록) ─────────────────────────────────────────
