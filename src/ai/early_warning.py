@@ -165,13 +165,40 @@ def trend_board():
     return rows
 
 
+def stage(trend, red, aux_, recent=20):
+    """시장 단계(docs/AI_PROFITABILITY.md 2026-11-24 사전 등록). 위에서부터 처음 맞는 조건."""
+    by = {t["ticker"]: t for t in trend}
+    spx = by.get("^GSPC", {})
+    if spx.get("state") not in ("보유", "이탈"):
+        return {"code": None, "name": "판정 불가", "why": "S&P 500 자료 부족"}
+    vix = aux_.get("vix", {})
+    if spx["state"] == "이탈":
+        if vix.get("run_ge30", 0) >= 3 or red >= 5:
+            return {"code": 4, "name": "위기", "why": f"S&P 이탈 + (VIX 30 이상 연속 {vix.get('run_ge30', 0)}일, 빨강 {red}개)"}
+        return {"code": 3, "name": "경계", "why": f"S&P 500 이탈({spx.get('since')}부터)"}
+    since = pd.Timestamp(spx["since"])
+    days = len(_px("^GSPC").loc[since:]) - 1
+    if days <= recent and (by["^GSPC"].get("since") != _first_valid(_px("^GSPC"))):
+        return {"code": 0, "name": "회복 관찰", "why": f"S&P 복귀 후 {days}거래일(20거래일까지)"}
+    if red >= 2 or any(by.get(k, {}).get("state") == "이탈" for k in ("QQQ", "SOXX")):
+        return {"code": 2, "name": "주의", "why": f"빨강 {red}개, QQQ·SOXX 이탈: " + ", ".join(k for k in ("QQQ", "SOXX") if by.get(k, {}).get("state") == "이탈")}
+    return {"code": 1, "name": "정상", "why": "해당 경고 없음"}
+
+
+def _first_valid(price):
+    v = price.rolling(200).mean().dropna().index
+    return str(v[0].date()) if len(v) else None
+
+
 def compute():
     ind = indicators()
-    return {"indicators": ind, "aux": aux(), "trend": trend_board(),
-            "red": sum(i["level"] == RED for i in ind), "yellow": sum(i["level"] == YELLOW for i in ind),
-            "green": sum(i["level"] == GREEN for i in ind)}
+    tb, ax = trend_board(), aux()
+    red = sum(i["level"] == RED for i in ind)
+    return {"indicators": ind, "aux": ax, "trend": tb, "stage": stage(tb, red, ax),
+            "red": red, "yellow": sum(i["level"] == YELLOW for i in ind), "green": sum(i["level"] == GREEN for i in ind)}
 
 
 def summary(ew):
     """장부용 요약: 지표별 신호등과 자산별 추세 상태."""
-    return {"levels": {i["id"]: i["level"] for i in ew["indicators"]}, "trend": {t["ticker"]: t["state"] for t in ew["trend"]}}
+    return {"levels": {i["id"]: i["level"] for i in ew["indicators"]}, "trend": {t["ticker"]: t["state"] for t in ew["trend"]},
+            "stage": ew["stage"]["name"]}

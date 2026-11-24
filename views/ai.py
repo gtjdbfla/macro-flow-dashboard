@@ -356,6 +356,9 @@ ew_ = load("results/ai_early_warning.json")
 if ew_:
     dot = {"green": "🟢", "yellow": "🟡", "red": "🔴", "na": "⚪"}
     st.markdown(f"#### 조기경보 패널 — 빨강 {ew_['red']} · 노랑 {ew_['yellow']} · 초록 {ew_['green']}")
+    sg = ew_.get("stage")
+    if sg:
+        st.markdown(f"**시장 단계: {sg['name']}** — {sg['why']}")
     st.caption("Threads 게시물(@_dplabs_)의 체크리스트 중 우리 데이터로 계산되는 지표입니다. 임계값은 게시물의 값이고 검증되지 않았습니다(표시 전용, 합계에 예측력 주장 없음). "
                "규칙은 docs/AI_PROFITABILITY.md(2026-11-24 사전 등록).")
     e1, e2 = st.columns([1.6, 1], gap="large")

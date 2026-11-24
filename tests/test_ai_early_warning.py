@@ -41,3 +41,19 @@ def test_early_changes():
     prev = {"levels": {"EW1": "green"}, "trend": {"NVDA": "보유"}}
     assert len(early_changes(cur, prev)) == 2
     assert early_changes(cur, None) == []
+
+
+def _tb(spx_state, since="2020-01-01", **others):
+    rows = [{"ticker": "^GSPC", "state": spx_state, "since": since}]
+    rows += [{"ticker": k, "state": v, "since": None} for k, v in others.items()]
+    return rows
+
+
+def test_stage_order(monkeypatch):
+    monkeypatch.setattr(EW, "_px", lambda t: _series([100.0] * 400))
+    assert EW.stage(_tb("이탈"), 1, {})["code"] == 3
+    assert EW.stage(_tb("이탈"), 5, {})["code"] == 4
+    assert EW.stage(_tb("이탈"), 0, {"vix": {"run_ge30": 3}})["code"] == 4
+    assert EW.stage(_tb("보유", QQQ="이탈"), 0, {})["code"] == 2
+    assert EW.stage(_tb("보유"), 2, {})["code"] == 2
+    assert EW.stage(_tb("보유", QQQ="보유"), 1, {})["code"] == 1

@@ -60,9 +60,22 @@ snap = G.snapshot(pd.Timestamp.now().date(), risk, flags, big4, metrics, _ctx())
 try:
     ew = EW.compute()
     snap["early"] = EW.summary(ew)
+    _prev = [json.loads(x) for x in (DATA_DIR / "ledger" / "guide.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()] if (DATA_DIR / "ledger" / "guide.jsonl").exists() else []
+    _prev = [r for r in _prev if r["date"] != snap["date"] and r.get("early", {}).get("stage")]
+    if _prev and _prev[-1]["early"]["stage"] != snap["early"]["stage"]:
+        import os
+        import requests
+        msg = f"시장 단계 변경: {_prev[-1]['early']['stage']} → {ew['stage']['name']} ({ew['stage']['why']})"
+        print("guide:", msg)
+        if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"):
+            try:
+                requests.post(f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage",
+                              data={"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": msg}, timeout=15)
+            except Exception as e:
+                print("guide: 알림 실패", e)
     (R / "ai_early_warning.json").write_text(json.dumps(ew, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     (R / "ai_early_warning.json").chmod(0o644)
-    print("guide: 조기경보 빨강", ew["red"], "노랑", ew["yellow"], "초록", ew["green"], "| 이탈", [t["ticker"] for t in ew["trend"] if t["state"] == "이탈"])
+    print("guide: 시장 단계", ew["stage"]["name"], "|", ew["stage"]["why"], "| 조기경보 빨강", ew["red"], "노랑", ew["yellow"], "초록", ew["green"], "| 이탈", [t["ticker"] for t in ew["trend"] if t["state"] == "이탈"])
 except Exception as e:
     print("guide: 조기경보 계산 실패", e)
 rows = G.append(DATA_DIR / "ledger" / "guide.jsonl", snap)

@@ -110,6 +110,8 @@ def early_changes(cur, prev):
     if not cur or not prev:
         return []
     out = []
+    if cur.get("stage") and prev.get("stage") and cur["stage"] != prev["stage"]:
+        out.append({"kind": "단계", "id": "시장 단계", "from": prev["stage"], "to": cur["stage"]})
     for grp, key in (("levels", "지표"), ("trend", "추세")):
         for k, v in cur.get(grp, {}).items():
             b = prev.get(grp, {}).get(k)
