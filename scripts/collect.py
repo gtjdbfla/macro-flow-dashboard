@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data import DATA_DIR, cftc, cloud, debt, fred, french, gpurent, sec, ssga, tokenprice, twse, yahoo  # noqa: E402
+from src.data import DATA_DIR, cboe, cftc, cloud, debt, fred, french, gpurent, sec, ssga, tokenprice, twse, yahoo  # noqa: E402
 from src.data.universe import CFTC, EW_PX, FRED_CREDIT, FRED_DAILY, FRED_VINTAGE, HOLDINGS_PX, KR_SECTOR_STOCKS, YAHOO  # noqa: E402
 
 only = sys.argv[1:]
@@ -29,6 +29,12 @@ if not only or "fred" in only:
         cov["fred"] = {"updated": now, "series": fred.collect({**FRED_DAILY, **FRED_CREDIT}, FRED_VINTAGE)}
     except Exception as e:
         cov["fred"] = {"updated": now, "error": str(e)[:200], "series": {}}
+
+if "cboe" in only:  # 처음에는 2019-10부터 날짜별로 받아 오래 걸린다(기본 전체 수집에는 넣지 않고 run_daily가 지정)
+    try:
+        cov["cboe"] = {"updated": now, "series": {"putcall": cboe.collect()}}
+    except Exception as e:
+        cov["cboe"] = {"updated": now, "error": str(e)[:200], "series": {}}
 
 if not only or "kis" in only:
     try:
