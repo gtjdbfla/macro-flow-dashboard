@@ -13,6 +13,10 @@ TREND_ASSETS = (("S&P 500", "^GSPC", False), ("나스닥100(QQQ)", "QQQ", False)
                 ("KODEX 미국AI광통신네트워크", "0173Y0.KS", True), ("AIPO", "AIPO", True), ("Bloom Energy", "BE", True),
                 ("Fermi", "FRMI", True))
 GREEN, YELLOW, RED, NA = "green", "yellow", "red", "na"
+# 사후 연구(2026-11-24, docs/AI_PROFITABILITY.md): 신호가 켜진 날 이후 63거래일 안에 QQQ가 −10% 이상 빠진 비율. 기준률 23.8%. 참고용.
+BASE_RATE = 0.238
+HIST_HIT = {"EW1": (0.79, "독립 사건 2~3개"), "EW2": (0.19, ""), "EW3": (0.17, "자료 2023-11~"), "EW4": (0.29, ""),
+            "EW6": (0.36, "신규 점등 7회"), "EW7": (0.41, "")}
 
 
 def _px(ticker):
@@ -194,7 +198,11 @@ def compute():
     ind = indicators()
     tb, ax = trend_board(), aux()
     red = sum(i["level"] == RED for i in ind)
-    return {"indicators": ind, "aux": ax, "trend": tb, "stage": stage(tb, red, ax),
+    for i in ind:
+        h = HIST_HIT.get(i["id"])
+        i["hist_hit"] = None if h is None else h[0]
+        i["hist_note"] = "" if h is None else h[1]
+    return {"indicators": ind, "aux": ax, "base_rate": BASE_RATE, "trend": tb, "stage": stage(tb, red, ax),
             "red": red, "yellow": sum(i["level"] == YELLOW for i in ind), "green": sum(i["level"] == GREEN for i in ind)}
 
 

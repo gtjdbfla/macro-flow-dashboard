@@ -363,7 +363,8 @@ if ew_:
                "규칙은 docs/AI_PROFITABILITY.md(2026-11-24 사전 등록).")
     e1, e2 = st.columns([1.6, 1], gap="large")
     with e1:
-        et = pd.DataFrame([{"": dot[i["level"]], "지표": i["name"], "상태": i["detail"], "기준일": i.get("asof") or ""} for i in ew_["indicators"]])
+        et = pd.DataFrame([{"": dot[i["level"]], "지표": i["name"], "상태": i["detail"], "과거 −10% 비율": "미검증" if i.get("hist_hit") is None else f"{i['hist_hit']:.0%}" + (f" ({i['hist_note']})" if i.get("hist_note") else ""),
+                           "기준일": i.get("asof") or ""} for i in ew_["indicators"]])
         st.dataframe(et, hide_index=True, width="stretch", height=410)
     with e2:
         a = ew_.get("aux", {})
@@ -376,6 +377,8 @@ if ew_:
                      f"{'50일선이 200일선 아래(데스크로스)' if x['death_cross'] else '50일선이 200일선 위'}")
         if "nfci" in a:
             st.write(f"시카고 연준 금융여건지수 {a['nfci']['value']:+.2f} (0보다 크면 평균보다 긴축)")
+        ui.note(f"'과거 −10% 비율'은 2000년 이후 이 신호가 켜진 날 뒤 63거래일 안에 QQQ가 10% 이상 빠진 비율입니다(아무 날이나 고르면 {ew_.get('base_rate', 0.238):.0%}). "
+                "사후 분석이고 독립 사건이 적어 참고용입니다. 빨강이 많다고 하락이 온다는 뜻은 아닙니다. ")
         ui.note("지표별 기준일이 다릅니다. 코스피와 외국인 수급은 한국 장 마감 후 갱신돼 하루 늦을 수 있습니다. 미입력 항목(빅테크 CAPEX 가이던스)은 수기 입력이 필요합니다.")
     st.markdown("**추세 상태판** — 200일선 아래 3거래일 연속 마감하면 '이탈', 위로 3거래일 연속이면 '복귀'")
     tt = pd.DataFrame([{"보유": "★" if t["owned"] else "", "대상": t["name"], "상태": t["state"], "전환일": t.get("since") or "",
