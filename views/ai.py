@@ -388,6 +388,19 @@ if ew_:
     ui.note("규칙은 데이터 시작 시점에 '보유'로 시작해 전환일이 실제 거래 신호가 아닐 수 있습니다. 과거 백테스트에서 이런 규칙은 낙폭은 줄였지만 수익률을 높인다는 보장은 없습니다. "
             "상장 200거래일 미만 종목은 '자료 부족'입니다.")
 
+sc_ = load("results/ai_scorecard.json")
+if sc_:
+    with st.expander(f"전향 성적표 — 기록 {sc_['snapshots']}일, 결과 확정 {sc_['matured']}일"):
+        st.caption("지금까지의 시험은 모두 사후 분석이라, 매일 기록한 신호를 이후 실제 결과로 채점합니다. 결과는 기록일 이후 63거래일 안에 QQQ가 10% 이상 빠졌는지이고, "
+                   "63거래일이 지나야 확정됩니다. 확정일이 60일 미만이면 판단하지 않습니다(docs/AI_PROFITABILITY.md 2026-11-25 사전 등록).")
+        if not sc_["matured"]:
+            st.info(f"아직 확정된 날이 없습니다. 첫 기록일 {sc_['first_snapshot']}의 결과는 약 3개월 뒤에 확정됩니다.")
+        else:
+            stt = pd.DataFrame([{"신호": k, "켜진 확정일": v["on"], "−10% 이어진 비율": None if v["rate"] is None else round(v["rate"] * 100)}
+                                for k, v in sc_["signals"].items()])
+            st.dataframe(stt, hide_index=True, width="stretch")
+            ui.note(f"기준률(모든 확정일) {sc_['base_rate']:.0%}. 날짜가 겹쳐 독립 표본이 아닙니다." + ("" if sc_["enough"] else " 확정일이 아직 적어 판단하지 않습니다."))
+
 guide_ = load("results/ai_guide.json")
 if guide_ and guide_.get("snapshot", {}).get("bubble"):
     bb = guide_["snapshot"]["bubble"]

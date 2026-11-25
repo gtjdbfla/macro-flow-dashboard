@@ -57,3 +57,17 @@ def test_stage_order(monkeypatch):
     assert EW.stage(_tb("보유", QQQ="이탈"), 0, {})["code"] == 2
     assert EW.stage(_tb("보유"), 2, {})["code"] == 2
     assert EW.stage(_tb("보유", QQQ="보유"), 1, {})["code"] == 1
+
+
+def test_scorecard_matures_and_counts():
+    from src.ai import scorecard as SC
+    idx = pd.bdate_range("2027-01-01", periods=100)
+    price = pd.Series(100.0, index=idx)
+    price.iloc[30:] = 85.0                       # 30일째부터 −15%
+    rows = [{"date": str(idx[0].date()), "early": {"levels": {"EW3": "red"}, "trend": {"QQQ": "보유"}, "stage": "주의"}},
+            {"date": str(idx[50].date()), "early": {"levels": {"EW3": "green"}, "trend": {"QQQ": "이탈"}, "stage": "경계"}}]
+    out = SC.score(rows, price)
+    assert out["matured"] == 1                   # 두 번째는 63거래일이 안 지남
+    assert out["signals"]["EW3 빨강"] == {"on": 1, "hit": 1, "rate": 1.0}
+    assert out["signals"]["단계 경계 이상"]["on"] == 0
+    assert out["base_rate"] == 1.0 and not out["enough"]

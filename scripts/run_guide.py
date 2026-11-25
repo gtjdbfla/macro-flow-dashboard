@@ -80,6 +80,17 @@ except Exception as e:
     print("guide: 조기경보 계산 실패", e)
 rows = G.append(DATA_DIR / "ledger" / "guide.jsonl", snap)
 out = {"snapshot": snap, "changes": G.compare(rows), "snapshots": len(rows)}
+try:
+    from src.ai import scorecard as SC
+    from src.data import PARQUET
+    from src.data.yahoo import _fname
+    qqq = pd.read_parquet(PARQUET / _fname("QQQ"))["close"].dropna()
+    sc = SC.score(rows, qqq)
+    (R / "ai_scorecard.json").write_text(json.dumps(sc, ensure_ascii=False, indent=1), encoding="utf-8")
+    (R / "ai_scorecard.json").chmod(0o644)
+    print("guide: 전향 성적표 스냅샷", sc["snapshots"], "확정", sc["matured"])
+except Exception as e:
+    print("guide: 성적표 실패", e)
 tmp = R / "ai_guide.json.tmp"
 tmp.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 tmp.chmod(0o644)
