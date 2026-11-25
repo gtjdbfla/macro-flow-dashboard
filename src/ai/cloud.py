@@ -53,6 +53,20 @@ def latest(h: pd.DataFrame, co: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def gain_series(h: pd.DataFrame, co: dict) -> pd.DataFrame:
+    """분기마다 (부문 매출 − 전년 동기) × 4 ÷ 1년 전 12개월 CAPEX. 분모는 회사 전체 CAPEX(거친 비교). 점검표 B5 입력."""
+    rows = []
+    for r in h.itertuples():
+        if r.ticker not in co or pd.isna(r.cloud_rev) or pd.isna(r.cloud_rev_prior):
+            continue
+        o = co[r.ticker][0]
+        same = o.index[abs((o.index - (r.quarter_end - pd.DateOffset(years=1))).days) < 20]
+        capex_lag = o.loc[same[0], "capex_ttm"] if len(same) else np.nan
+        ratio = (r.cloud_rev - r.cloud_rev_prior) * 4 * 1e6 / capex_lag if capex_lag == capex_lag and capex_lag > 0 else np.nan
+        rows.append({"ticker": r.ticker, "quarter_end": r.quarter_end, "ratio": ratio})
+    return pd.DataFrame(rows, columns=["ticker", "quarter_end", "ratio"])
+
+
 def flags(h: pd.DataFrame, tw: pd.DataFrame | None) -> list:
     """F7 클라우드 성장·마진, F8 대만 AI 공급망 월매출. 임계값은 docs/AI_PROFITABILITY.md에 사전 고정."""
     out = []

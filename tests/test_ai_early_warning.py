@@ -71,3 +71,14 @@ def test_scorecard_matures_and_counts():
     assert out["signals"]["EW3 빨강"] == {"on": 1, "hit": 1, "rate": 1.0}
     assert out["signals"]["단계 경계 이상"]["on"] == 0
     assert out["base_rate"] == 1.0 and not out["enough"]
+
+
+def test_bubble_b5_cloud_gain():
+    from src.ai.guide import bubble_checks
+    big4 = pd.DataFrame({"period_end": pd.to_datetime(["2026-06-30", "2026-09-30"]), "capex_yoy": [0.5, 0.6], "capex_ocf": [0.8, 0.9],
+                         "fcf_ttm": [2e11, 1e11], "ocf_yoy": [0.2, 0.2]})
+    up = {"AMZN": [("2026-06-30", 0.3), ("2026-09-30", 0.4)], "GOOGL": [("2026-06-30", 0.5), ("2026-09-30", 0.8)]}
+    b = lambda cg: {i["id"]: i for i in bubble_checks(big4, {}, {"cloud_gain": cg}, "2026-11-25")["resolution"]}["B5"]
+    assert b(up)["ok"] is True
+    assert b({**up, "AMZN": [("2026-06-30", 0.5), ("2026-09-30", 0.4)]})["ok"] is False
+    assert b({"AMZN": up["AMZN"]})["ok"] is None

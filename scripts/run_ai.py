@@ -39,6 +39,7 @@ fl = M.flags(co, prices)
 ch = C.history()
 ch.to_parquet(out / "ai_cloud_history.parquet")
 C.latest(ch, co).to_parquet(out / "ai_cloud_latest.parquet")
+C.gain_series(ch, co).to_parquet(out / "ai_cloud_gain.parquet")
 C.aggregate(ch).reset_index().to_parquet(out / "ai_cloud_agg.parquet")
 tw_f = PARQUET / "twse_monthly.parquet"
 tw = pd.read_parquet(tw_f) if tw_f.exists() else None

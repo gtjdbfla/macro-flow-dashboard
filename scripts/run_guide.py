@@ -38,6 +38,8 @@ def _ctx():
         ctx["support_ratio"] = [float(v) for v in dq.tail(2)]
         cov = pd.read_parquet(R / "ai_end_revenue_coverage.parquet").dropna(subset=["coverage"]).query("ticker == 'MSFT'").sort_values("period_end")
         ctx["coverage"] = [(str(r.period_end.date()), float(r.coverage)) for r in cov.tail(2).itertuples()]
+        cgn = pd.read_parquet(R / "ai_cloud_gain.parquet").sort_values("quarter_end")
+        ctx["cloud_gain"] = {t: [(str(r.quarter_end.date()), float(r.ratio)) for r in g.dropna(subset=["ratio"]).itertuples()] for t, g in cgn.groupby("ticker")}
         aq = ED.anthropic_quarters()
         ctx["anthropic_ratio"] = [float(v) for v in aq.compute_ratio.tail(2)]
         cds = sorted((d, v) for d, v, t, _ in ED.CRWV_STRESS if "CDS" in t)

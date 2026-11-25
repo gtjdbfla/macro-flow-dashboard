@@ -140,7 +140,7 @@ def _less(a, b, fmt="{:.3g}"):
 def bubble_checks(big4, flags, ctx, today):
     """해소 조건과 악화 신호. ctx 키: real_rate_3m(10년 실질금리 3개월 변화 %p), hy_4w(하이일드 4주 변화 %p), support_ratio(최근 두 값 리스트),
     coverage(최근 두 AI 매출÷CAPEX 공개치 [(분기말, 값)]), anthropic_ratio(최근 두 컴퓨팅비용÷매출), crwv_cds([(일자, bp)] 오름차순),
-    soxx_1m(SOXX 1개월 수익률), vix."""
+    cloud_gain({티커: [(분기말, 클라우드 연환산 매출 증가÷1년 전 CAPEX)] 오름차순}), soxx_1m(SOXX 1개월 수익률), vix."""
     today = pd.Timestamp(today)
     h = big4.sort_values("period_end").dropna(subset=["capex_yoy"]).tail(2)
     cur = h.iloc[-1] if len(h) else None
@@ -166,7 +166,17 @@ def bubble_checks(big4, flags, ctx, today):
         res.append(_item("B", "B2", "AI 연환산 매출 ÷ CAPEX가 직전 공개치보다 높다", ok, d))
     else:
         last = cov[-1][0] if cov else "없음"
-        res.append(_item("B", "B2", "AI 연환산 매출 ÷ CAPEX가 직전 공개치보다 높다", None, f"최신 공개가 200일보다 오래됨(최신 {last})"))
+        res.append(_item("B", "B2", "AI 연환산 매출 ÷ CAPEX가 직전 공개치보다 높다", None,
+                         f"최신 공개가 200일보다 오래됨(최신 {last}). 마이크로소프트가 2026-09 분기 개편 뒤 공개를 중단해 B5가 대신 본다"))
+    cg = ctx.get("cloud_gain") or {}
+    pairs = {t: [x for x in (cg.get(t) or []) if pd.notna(x[1])][-2:] for t in ("AMZN", "GOOGL")}
+    if all(len(v) == 2 for v in pairs.values()):
+        names = {"AMZN": "AWS", "GOOGL": "Google Cloud"}
+        ok = all(v[1][1] > v[0][1] for v in pairs.values())
+        d = " · ".join(f"{names[t]} {v[0][1]:.2f} → {v[1][1]:.2f}" for t, v in pairs.items())
+        res.append(_item("B", "B5", "클라우드(AWS·Google Cloud) 연환산 매출 증가 ÷ 1년 전 CAPEX가 직전 분기보다 둘 다 높다", ok, d))
+    else:
+        res.append(_item("B", "B5", "클라우드(AWS·Google Cloud) 연환산 매출 증가 ÷ 1년 전 CAPEX가 직전 분기보다 둘 다 높다", None, "자료 부족"))
     ar = ctx.get("anthropic_ratio") or []
     ok, d = _less(ar[-1], ar[-2], "{:.0%}") if len(ar) >= 2 else (None, "자료 부족")
     res.append(_item("B", "B3", "Anthropic 매출 대비 컴퓨팅 비용 비율이 직전 분기보다 낮다", ok, d))
