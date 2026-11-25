@@ -82,3 +82,11 @@ def test_bubble_b5_cloud_gain():
     assert b(up)["ok"] is True
     assert b({**up, "AMZN": [("2026-06-30", 0.5), ("2026-09-30", 0.4)]})["ok"] is False
     assert b({"AMZN": up["AMZN"]})["ok"] is None
+
+
+def test_circular_facts_and_amazon_share():
+    from src.ai import circular as CR
+    d = CR.facts()
+    assert set(d.columns) == {"고리", "기준", "항목", "내용", "출처"} and len(d) >= 10
+    assert d.출처.str.startswith("https://").all()
+    assert abs(CR.amazon_markup_share() - 0.4256) < 0.001

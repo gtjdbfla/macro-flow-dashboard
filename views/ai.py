@@ -9,7 +9,7 @@ import streamlit as st
 import ai_view
 import ui
 from src.ai import demand_quality
-from src.ai import end_demand, holdings
+from src.ai import circular, end_demand, holdings
 from src.ai.end_demand import GEMINI_TOKENS as ED_TOKENS
 from ui import badge, level_kind, load, load_parquet_dir, pct, plot
 
@@ -351,6 +351,16 @@ if hf is not None and hp is not None:
         st.dataframe(fm, hide_index=True, width="stretch")
         st.markdown(f"[Fermi 10-Q 원문]({holdings.FERMI_10Q})")
         st.caption("다른 보유 종목과 달리 매출이 없는 개발 단계 회사입니다. 업종 신호보다 임차인 계약, 자금 조달, 토지 임대 착공 통지 기한 같은 개별 사건이 중요합니다.")
+
+with st.expander("순환 구조 — 공시로 확인한 돈의 연결고리"):
+    st.caption("공급자·클라우드가 AI 기업에 투자하거나 지원하면, 그 돈이 다시 그 회사의 칩과 클라우드를 사는 데 쓰이는 구조입니다. 위법이라는 뜻이 아니라 "
+               "매출 일부가 외부 고객이 아닌 공급자 자신의 자본에서 나올 수 있다는 점을 보는 항목입니다. 회사 공시 값만 옮겼고 판정은 하지 않습니다. 금액 단위는 억 달러입니다.")
+    ft = circular.facts()
+    st.dataframe(ft.drop(columns="출처").assign(출처=ft.출처), hide_index=True, width="stretch",
+                 column_config={"출처": st.column_config.LinkColumn("원문", display_text="열기")})
+    ui.note("NVIDIA 고객 지원성 약정(보증·네오클라우드·지분투자·클라우드 서비스)과 Anthropic 약정은 위 표 대신 수요의 질(F16)과 최종 수요 섹션에 있습니다. "
+            "OpenAI, 소프트뱅크, CoreWeave 대출자의 약정은 아직 추적하지 않습니다. Amazon의 평가이익은 실제 현금이 아니라 Anthropic 신규 투자 가격에 맞춘 장부상 이익이며, "
+            "Anthropic이 상장한 뒤 주가에 따라 달라집니다.")
 
 ew_ = load("results/ai_early_warning.json")
 if ew_:
