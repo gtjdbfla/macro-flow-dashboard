@@ -82,6 +82,13 @@ except Exception as e:
     print("guide: 조기경보 계산 실패", e)
 rows = G.append(DATA_DIR / "ledger" / "guide.jsonl", snap)
 G.annotate_since(snap["bubble"], rows)   # 장부에는 이미 기록됨. 화면용 켜진 날만 덧붙인다
+try:  # 장부(2026-11-20~)보다 오래 켜진 두 항목은 원자료로 시작일을 거슬러 계산한다
+    from src.ai import demand_quality as DQ
+    from src.ai import end_demand as ED
+    _dq = pd.read_parquet(R / "ai_demand_quality.parquet").set_index("period_end").support_ratio
+    G.retro_since(snap["bubble"], ramp_all=ED.ramp()["전체"], support=_dq, released=DQ.RELEASED)
+except Exception as e:
+    print("guide: 켜진 날 거슬러 계산 실패", e)
 out = {"snapshot": snap, "changes": G.compare(rows), "snapshots": len(rows)}
 try:
     from src.ai import scorecard as SC

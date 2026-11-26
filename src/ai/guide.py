@@ -141,6 +141,43 @@ def annotate_since(bubble, rows):
             item["since"], item["since_kind"] = since, kind
 
 
+def streak_start(series, test):
+    """series(시간 오름차순)의 끝에서부터 test(값, 직전 값)가 연속으로 참인 구간의 시작 인덱스. 최신 값이 거짓이면 None."""
+    vals = list(series.items())
+    start = None
+    for i in range(len(vals) - 1, 0, -1):
+        cur, prev = vals[i][1], vals[i - 1][1]
+        if pd.isna(cur) or pd.isna(prev) or not test(cur, prev):
+            break
+        start = vals[i][0]
+    return start
+
+
+def retro_since(bubble, ramp_all=None, support=None, released=None, adopt_up=0.03):
+    """장부가 짧은 두 항목의 켜진 날을 원자료로 거슬러 계산한다. B4(AI 도입 확산, Ramp 6개월 변화 +3%p 이상): 연속 충족이 시작된 관측월.
+    C1(NVIDIA 지원성 약정 ÷ 매출, 직전 분기보다 낮다): 연속 하락이 시작된 분기의 실적 발표일. 값이 없으면 건드리지 않는다."""
+    items = {i["id"]: i for i in bubble.get("resolution", [])}
+    b4 = items.get("B4")
+    if b4 and b4["ok"] is True and ramp_all is not None and len(ramp_all.dropna()) > 6:
+        s = ramp_all.dropna().sort_index()
+        change = s - s.shift(6)
+        flags = [bool(v >= adopt_up) for v in change.dropna()]
+        idx = list(change.dropna().index)
+        start = None
+        for d, f in zip(reversed(idx), reversed(flags)):
+            if not f:
+                break
+            start = d
+        if start is not None:
+            b4["since"], b4["since_kind"] = str(start.date()), "obs"
+    c1 = items.get("C1")
+    if c1 and c1["ok"] is True and support is not None and released:
+        start = streak_start(support.dropna(how="all") if hasattr(support, "dropna") else support, lambda cur, prev: cur < prev)
+        key = str(start.date()) if start is not None else None
+        if key in released:
+            c1["since"], c1["since_kind"] = released[key], "release"
+
+
 # ── 거품론 점검표(docs/AI_PROFITABILITY.md, 2026-11-20 사전 등록) ─────────────────────────────────────────
 COVERAGE_MAX_AGE, CDS_MAX_AGE = 200, 10
 CAPEX_DROP = 0.10

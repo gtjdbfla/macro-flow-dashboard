@@ -178,7 +178,8 @@ def _since_text(item):
     if item.get("ok") is not True or not d:
         return ""
     md = d[5:]
-    return {"exact": f"{md}부터", "record": f"{md} 이전부터", "new": f"{md} 신설"}.get(item.get("since_kind"), f"{md}부터")
+    return {"exact": f"{md}부터", "record": f"{md} 이전부터", "new": f"{md} 신설",
+            "obs": f"{d[:7]}월분부터", "release": f"{md}부터(발표)"}.get(item.get("since_kind"), f"{md}부터")
 
 
 def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_height=240):
@@ -200,7 +201,7 @@ def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_heig
     with cols[1]:
         st.markdown(f"**악화 신호** — {n_w}/{len(warn)} 발생")
         st.dataframe(ws, hide_index=True, width="stretch", height=warn_height, column_config={"켜진 날": st.column_config.TextColumn(width="small")})
-    st.caption("'켜진 날'은 우리 기록에서 연속으로 켜진 시작일입니다. 점검표 기록이 2026-11-20부터라 그 이전부터 켜져 있었을 수 있는 항목은 '이전부터'로 적었고, 앞으로 쌓이는 기록으로 정확해집니다.")
+    st.caption("'켜진 날'은 연속으로 켜진 시작일입니다. 점검표 기록이 2026-11-20부터라 그 이전부터일 수 있는 항목은 '이전부터', 원자료로 거슬러 계산한 항목은 '○○월분부터'(자료의 관측월) 또는 '부터(발표)'(실적 발표일)로 적었습니다.")
 
 
 def summary_card(title, badges, headline, items):

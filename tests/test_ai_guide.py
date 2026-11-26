@@ -135,3 +135,15 @@ def test_annotate_since_marks_exact_record_and_new():
     cur2 = {"resolution": [{"id": "A1", "ok": True}], "warning": []}
     annotate_since(cur2, rows2)
     assert (cur2["resolution"][0]["since"], cur2["resolution"][0]["since_kind"]) == ("2026-11-20", "record")
+
+
+def test_retro_since_ramp_and_nvidia_support():
+    from src.ai.guide import retro_since, streak_start
+    idx = pd.date_range("2025-01-01", periods=12, freq="MS")
+    ramp = pd.Series([.30, .31, .32, .33, .34, .35, .36, .38, .40, .42, .44, .46], index=idx)   # 6개월 변화: 7월부터 +6%p 이상
+    sup = pd.Series([float("nan"), 0.655, 0.547], index=pd.to_datetime(["2026-04-26", "2026-07-26", "2026-10-25"]))
+    b = {"resolution": [{"id": "B4", "ok": True}, {"id": "C1", "ok": True}], "warning": []}
+    retro_since(b, ramp_all=ramp, support=sup, released={"2026-10-25": "2026-11-17"})
+    assert b["resolution"][0]["since_kind"] == "obs" and b["resolution"][0]["since"] == "2025-07-01"
+    assert (b["resolution"][1]["since"], b["resolution"][1]["since_kind"]) == ("2026-11-17", "release")
+    assert streak_start(pd.Series([3, 2, 1]), lambda c, p: c < p) == 1 or streak_start(pd.Series([3, 2, 1]), lambda c, p: c < p) == 2
