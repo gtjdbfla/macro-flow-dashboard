@@ -90,3 +90,25 @@ def test_circular_facts_and_amazon_share():
     assert set(d.columns) == {"고리", "기준", "항목", "내용", "출처"} and len(d) >= 10
     assert d.출처.str.startswith("https://").all()
     assert abs(CR.amazon_markup_share() - 0.4256) < 0.001
+
+
+def test_audit_freshness_cadence_rules():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("audit_freshness", "scripts/audit_freshness.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert m.max_age("fred_DGS10") == 6 and m.max_age("fred_WALCL") == 14 and m.max_age("fredv_CPILFESL") == 80
+    assert m.max_age("fredv_CP") == 150 and m.max_age("french_ff") == 75 and m.max_age("kis_investor_kospi") == 6
+    assert m.max_age("ai_history") is None
+
+
+def test_ew10_capex_guide_needs_two_companies_and_flags_below_20():
+    assert EW._capex_guide(())["level"] == "na"
+    one = (("MSFT", "2027-01-28", "FY27", 1000, 30.0, "https://x", ""),)
+    assert EW._capex_guide(one)["level"] == "na"
+    two = one + (("GOOGL", "2027-02-04", "2027", 900, 10.0, "https://y", ""),)
+    assert EW._capex_guide(two)["level"] == "green"         # 중앙값 (30+10)/2=20은 '20% 미만'이 아니다
+    three = two + (("META", "2027-01-29", "2027", 800, 5.0, "https://z", ""),)
+    assert EW._capex_guide(three)["level"] == "red"
+    ok = (("MSFT", "2027-01-28", "FY27", 1000, 40.0, "https://x", ""), ("GOOGL", "2027-02-04", "2027", 900, 25.0, "https://y", ""))
+    assert EW._capex_guide(ok)["level"] == "green"

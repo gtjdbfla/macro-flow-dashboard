@@ -92,6 +92,24 @@ def _ind(key, name, level, value, detail, asof=None):
     return {"id": key, "name": name, "level": level, "value": value, "detail": detail, "asof": asof}
 
 
+def _capex_guide(guides=None):
+    """EW10: 회사가 밝힌 다음 해 CAPEX 증가율 중앙값. 2곳 이상 있어야 판정하고 20% 미만이면 빨강."""
+    if guides is None:
+        from src.ai import capex_guide
+        guides = capex_guide.GUIDES
+    latest = {}
+    for g in sorted(guides, key=lambda x: x[1]):
+        if g[4] is not None:
+            latest[g[0]] = g
+    if len(latest) < 2:
+        return _ind("EW10", "빅테크 다음 해 CAPEX 가이던스 증가율", NA, None,
+                    f"수기 항목(회사 {len(latest)}곳 입력, 2곳 이상 필요). 20% 미만이면 빨강")
+    growth = float(np.median([g[4] for g in latest.values()]))
+    detail = " · ".join(f"{t} {g[4]:+.0f}%({g[2]})" for t, g in latest.items())
+    return _ind("EW10", "빅테크 다음 해 CAPEX 가이던스 증가율", RED if growth < 20 else GREEN, growth, f"중앙값 {growth:+.0f}% · {detail}",
+                max(g[1] for g in latest.values()))
+
+
 def indicators():
     out = []
     y10 = _fred("DGS10")
@@ -141,7 +159,7 @@ def indicators():
     if len(mom):
         out.append(_ind("EW9", "근원 CPI 전월비", level_cpi(float(mom.iloc[-1])), float(mom.iloc[-1]),
                         f"{mom.iloc[-1]:+.2f}% ({mom.index[-1]:%Y-%m})", str(mom.index[-1].date())))
-    out.append(_ind("EW10", "빅테크 다음 해 CAPEX 가이던스 증가율", NA, None, "수기 항목(미입력). 20% 미만이면 빨강"))
+    out.append(_capex_guide())
     return out
 
 

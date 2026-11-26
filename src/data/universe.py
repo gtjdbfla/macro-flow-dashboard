@@ -35,6 +35,7 @@ FRED_DAILY = {
     "DTWEXBGS": "Broad USD", "DCOILWTICO": "WTI", "NFCI": "Chicago FCI (weekly)",
     "WALCL": "Fed balance sheet (weekly)", "WTREGEN": "TGA (weekly)", "RRPONTSYD": "ON RRP",
     # 조기경보 패널(2026-11-24): 정책금리 상단, 삼의 법칙(월), 실업수당 4주 평균(주)
+    "BAA10Y": "Moody's Baa − 10Y spread",
     "DFEDTARU": "Fed target upper", "SAHMREALTIME": "Sahm rule (monthly)", "IC4WSA": "Initial claims 4wk avg (weekly)",
 }
 # 신용등급대별 옵션조정스프레드(ICE BofA). FRED는 최근 3년만 제공. AI 차입자(Oracle=BBB급, CoreWeave=B~BB급)의 시장 금융환경을 본다.
@@ -45,6 +46,7 @@ FRED_VINTAGE = {
     "INDPRO": "Industrial Production", "M2SL": "M2", "ICSA": "Initial Claims",
     "RSAFS": "Retail Sales", "DGORDER": "Durable Goods Orders",
     # Ramp AI Index(F17): 미국 기업 중 AI에 지출한 비율, 2026-10 FRED 추가
+    "CP": "Corporate profits (quarterly)",
     "RAMPAIALL": "Ramp AI adoption", "RAMPAISMB": "Ramp AI adoption small", "RAMPAIMIDMARKET": "Ramp AI adoption mid",
     "RAMPAIENTERPRISE": "Ramp AI adoption large",
 }
