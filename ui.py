@@ -172,12 +172,21 @@ def _colored(df, flags, hit_css):
     return df.style.apply(row_css, axis=1)
 
 
+def _since_text(item):
+    """켜진 날(장부 기준). 장부가 2026-11-20부터라 그 이전에 켜졌을 수 있는 항목은 '이전부터'로 적는다."""
+    d = item.get("since")
+    if item.get("ok") is not True or not d:
+        return ""
+    md = d[5:]
+    return {"exact": f"{md}부터", "record": f"{md} 이전부터", "new": f"{md}부터(항목 신설)"}.get(item.get("since_kind"), f"{md}부터")
+
+
 def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_height=240):
     """거품론 점검표: 해소 조건(충족=초록)과 악화 신호(발생=빨강)를 나눠 보여 준다. bb는 guide.snapshot['bubble']."""
     import pandas as pd
     res, warn = bb["resolution"], bb["warning"]
-    rt = pd.DataFrame([{"묶음": group_labels[i["group"]], "조건": i["text"], "충족": _MARK[i["ok"]], "근거": i["detail"]} for i in res])
-    wt = pd.DataFrame([{"신호": i["text"], "발생": _MARK[i["ok"]], "근거": i["detail"]} for i in warn])
+    rt = pd.DataFrame([{"묶음": group_labels[i["group"]], "조건": i["text"], "충족": _MARK[i["ok"]], "켜진 날": _since_text(i), "근거": i["detail"]} for i in res])
+    wt = pd.DataFrame([{"신호": i["text"], "발생": _MARK[i["ok"]], "켜진 날": _since_text(i), "근거": i["detail"]} for i in warn])
     rs = _colored(rt, [i["ok"] for i in res], GOOD_BG)
     ws = _colored(wt, [i["ok"] for i in warn], BAD_BG)
     n_ok = sum(i["ok"] is True for i in res)
@@ -187,10 +196,11 @@ def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_heig
     cols = st.columns([1.5, 1], gap="large") if side_by_side else [st.container(), st.container()]
     with cols[0]:
         st.markdown(f"**해소 조건** — {n_ok}/{len(res)} 충족")
-        st.dataframe(rs, hide_index=True, width="stretch", height=res_height)
+        st.dataframe(rs, hide_index=True, width="stretch", height=res_height, column_config={"켜진 날": st.column_config.TextColumn(width="small")})
     with cols[1]:
         st.markdown(f"**악화 신호** — {n_w}/{len(warn)} 발생")
-        st.dataframe(ws, hide_index=True, width="stretch", height=warn_height)
+        st.dataframe(ws, hide_index=True, width="stretch", height=warn_height, column_config={"켜진 날": st.column_config.TextColumn(width="small")})
+    st.caption("'켜진 날'은 우리 기록에서 연속으로 켜진 시작일입니다. 점검표 기록이 2026-11-20부터라 그 이전부터 켜져 있었을 수 있는 항목은 '이전부터'로 적었고, 앞으로 쌓이는 기록으로 정확해집니다.")
 
 
 def summary_card(title, badges, headline, items):

@@ -119,3 +119,19 @@ def test_bubble_changes_between_snapshots():
     changes = G.bubble_changes(after, before)
     assert [c["id"] for c in changes] == ["C5"] and changes[0]["from"] is False and changes[0]["to"] is True
     assert G.bubble_changes(after, None) == []
+
+
+def test_annotate_since_marks_exact_record_and_new():
+    from src.ai.guide import annotate_since
+    def snap(date, a, b=None):
+        res = [{"id": "A1", "ok": a}] + ([{"id": "B5", "ok": b}] if b is not None else [])
+        return {"date": date, "bubble": {"resolution": res, "warning": []}}
+    rows = [snap("2026-11-20", False), snap("2026-11-21", True), snap("2026-11-22", True, True)]
+    cur = {"resolution": [{"id": "A1", "ok": True}, {"id": "B5", "ok": True}], "warning": []}
+    annotate_since(cur, rows)
+    assert (cur["resolution"][0]["since"], cur["resolution"][0]["since_kind"]) == ("2026-11-21", "exact")
+    assert (cur["resolution"][1]["since"], cur["resolution"][1]["since_kind"]) == ("2026-11-22", "new")
+    rows2 = [snap("2026-11-20", True), snap("2026-11-21", True)]
+    cur2 = {"resolution": [{"id": "A1", "ok": True}], "warning": []}
+    annotate_since(cur2, rows2)
+    assert (cur2["resolution"][0]["since"], cur2["resolution"][0]["since_kind"]) == ("2026-11-20", "record")

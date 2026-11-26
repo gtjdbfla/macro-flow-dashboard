@@ -120,6 +120,27 @@ def early_changes(cur, prev):
     return out
 
 
+def annotate_since(bubble, rows):
+    """충족·발생(ok=True)인 점검표 항목마다 연속으로 켜진 시작일을 장부에서 찾아 since, since_kind를 붙인다.
+    since_kind: 'exact'(그 전날 장부에 꺼져 있었음), 'record'(장부 시작일까지 계속 켜져 있어 그 이전부터일 수 있음), 'new'(그 전 장부에 항목이 없었음)."""
+    dated = [r for r in rows if r.get("bubble")]
+    for key in ("resolution", "warning"):
+        for item in bubble.get(key, []):
+            if item["ok"] is not True:
+                continue
+            since, kind = None, "record"
+            for r in reversed(dated):
+                prev = next((x for x in r["bubble"].get(key, []) if x["id"] == item["id"]), None)
+                if prev is None:
+                    kind = "new"
+                    break
+                if prev["ok"] is not True:
+                    kind = "exact"
+                    break
+                since = r["date"]
+            item["since"], item["since_kind"] = since, kind
+
+
 # ── 거품론 점검표(docs/AI_PROFITABILITY.md, 2026-11-20 사전 등록) ─────────────────────────────────────────
 COVERAGE_MAX_AGE, CDS_MAX_AGE = 200, 10
 CAPEX_DROP = 0.10

@@ -81,6 +81,7 @@ try:
 except Exception as e:
     print("guide: 조기경보 계산 실패", e)
 rows = G.append(DATA_DIR / "ledger" / "guide.jsonl", snap)
+G.annotate_since(snap["bubble"], rows)   # 장부에는 이미 기록됨. 화면용 켜진 날만 덧붙인다
 out = {"snapshot": snap, "changes": G.compare(rows), "snapshots": len(rows)}
 try:
     from src.ai import scorecard as SC
