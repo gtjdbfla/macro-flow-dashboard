@@ -29,8 +29,8 @@ def _ctx():
     from src.ai import end_demand as ED
     ctx = {}
     try:
-        rr = _fred("DFII10"); ctx["real_rate_3m"] = float(rr.iloc[-1] - rr.iloc[-64])
-        hy = _fred("BAMLH0A0HYM2"); ctx["hy_4w"] = float(hy.iloc[-1] - hy.iloc[-21])
+        rr = _fred("DFII10"); ctx["real_rate_20d"] = float(rr.iloc[-1] - rr.iloc[-21])
+        hy = _fred("BAMLH0A0HYM2"); ctx["hy_20d"] = float(hy.iloc[-1] - hy.iloc[-21]); ctx["hy_vs_low"] = float(hy.iloc[-1] - hy.tail(252).min())
     except Exception as e:
         print("guide: FRED 입력 실패", e)
     try:
@@ -41,7 +41,11 @@ def _ctx():
         cgn = pd.read_parquet(R / "ai_cloud_gain.parquet").sort_values("quarter_end")
         ctx["cloud_gain"] = {t: [(str(r.quarter_end.date()), float(r.ratio)) for r in g.dropna(subset=["ratio"]).itertuples()] for t, g in cgn.groupby("ticker")}
         aq = ED.anthropic_quarters()
-        ctx["anthropic_ratio"] = [float(v) for v in aq.compute_ratio.tail(2)]
+        ctx["anthropic_ratio"] = [float(v) for v in aq.compute_ratio.tail(3)]
+        dqf = pd.read_parquet(R / "ai_demand_quality.parquet").set_index("period_end").dropna(subset=["support"]).tail(2)
+        if len(dqf) == 2:
+            ctx["support_detail"] = (f"약정 {dqf.support.iloc[0] / 1e8:,.0f}억 → {dqf.support.iloc[1] / 1e8:,.0f}억 달러, "
+                                     f"12개월 매출 {dqf.revenue_ttm.iloc[1] / dqf.revenue_ttm.iloc[0] - 1:+.0%} (비교 2점)")
         cds = sorted((d, v) for d, v, t, _ in ED.CRWV_STRESS if "CDS" in t)
         ctx["crwv_cds"] = [(d, v) for d, v in cds]
     except Exception as e:
@@ -106,7 +110,8 @@ tmp.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str), encod
 tmp.chmod(0o644)
 tmp.replace(R / "ai_guide.json")
 b = snap["bubble"]
-print("guide: 거품론 해소 조건 예", [i["ok"] for i in b["resolution"]].count(True), "/", len(b["resolution"]),
+n_res = [i for i in b["resolution"] if i["group"] in ("A", "B", "C")]
+print("guide: 거품론 해소 조건 예", [i["ok"] for i in n_res].count(True), "/", len(n_res), "(시장 분위기 D 제외)",
       "| 악화 신호 발생", [i["ok"] for i in b["warning"]].count(True), "/", len(b["warning"]))
 ok = [i["ok"] for i in snap["checklist"]]
 print("guide:", snap["date"], "점검표 예", ok.count(True), "/ 아니오", ok.count(False), "/ 자료 부족", ok.count(None), "| 스냅샷", len(rows))

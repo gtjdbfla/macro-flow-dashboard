@@ -180,6 +180,9 @@ def retro_since(bubble, ramp_all=None, support=None, released=None, adopt_up=0.0
 
 # ── 거품론 점검표(docs/AI_PROFITABILITY.md, 2026-11-20 사전 등록) ─────────────────────────────────────────
 COVERAGE_MAX_AGE, CDS_MAX_AGE = 200, 10
+CAPEX_OCF_OK, CAPEX_OCF_DROP_PP = 0.75, 0.05          # A1(2026-11-26 개정)
+RATE_20D_BP, HY_20D_BP = -25, -20                     # C5·C6: scoring/macro_outlook.py의 rates·credit 기준
+W_CAPEX_OCF, W_HY_FROM_LOW_BP, W_CDS_BP = 1.0, 100, 1000   # W7·W8·W9
 CAPEX_DROP = 0.10
 BUBBLE_GROUPS = {"A": "현금 회수", "B": "최종 수요", "C": "금융", "D": "시장 안정(가격)"}
 
@@ -196,25 +199,26 @@ def _less(a, b, fmt="{:.3g}"):
 
 
 def bubble_checks(big4, flags, ctx, today):
-    """해소 조건과 악화 신호. ctx 키: real_rate_3m(10년 실질금리 3개월 변화 %p), hy_4w(하이일드 4주 변화 %p), support_ratio(최근 두 값 리스트),
-    coverage(최근 두 AI 매출÷CAPEX 공개치 [(분기말, 값)]), anthropic_ratio(최근 두 컴퓨팅비용÷매출), crwv_cds([(일자, bp)] 오름차순),
+    """해소 조건과 악화 신호. ctx 키: real_rate_20d(10년 실질금리 20거래일 변화 %p), hy_20d(하이일드 20거래일 변화 %p), hy_vs_low(하이일드 − 252거래일 최저 %p), support_ratio(최근 두 값 리스트), support_detail(C1 설명 문장),
+    coverage(최근 두 AI 매출÷CAPEX 공개치 [(분기말, 값)]), anthropic_ratio(최근 세 컴퓨팅비용÷매출), crwv_cds([(일자, bp)] 오름차순),
     cloud_gain({티커: [(분기말, 클라우드 연환산 매출 증가÷1년 전 CAPEX)] 오름차순}), soxx_1m(SOXX 1개월 수익률), vix."""
     today = pd.Timestamp(today)
     h = big4.sort_values("period_end").dropna(subset=["capex_yoy"]).tail(2)
     cur = h.iloc[-1] if len(h) else None
     res, warn = [], []
 
-    ok, d = _less(*(h.capex_ocf.iloc[::-1] if len(h) == 2 else (None, None)), "{:.0%}")
-    res.append(_item("A", "A1", "Big4 CAPEX ÷ 영업현금흐름이 직전 분기보다 낮다", ok, d))
+    if len(h) == 2:
+        now, before = h.capex_ocf.iloc[1], h.capex_ocf.iloc[0]
+        ok = bool(now <= CAPEX_OCF_OK or before - now >= CAPEX_OCF_DROP_PP)
+        d = f"{before:.0%} → {now:.0%} (75% 이하이거나 5%p 이상 하락이면 충족)"
+    else:
+        ok, d = None, "자료 부족"
+    res.append(_item("A", "A1", "Big4 CAPEX ÷ 영업현금흐름이 75% 이하이거나 직전 분기보다 5%p 이상 낮아졌다", ok, d))
     if len(h) == 2:
         ok = h.fcf_ttm.iloc[1] > h.fcf_ttm.iloc[0]
         res.append(_item("A", "A2", "Big4 12개월 잉여현금흐름이 직전 분기보다 늘었다", ok, f"{h.fcf_ttm.iloc[0] / 1e8:,.0f}억 → {h.fcf_ttm.iloc[1] / 1e8:,.0f}억 달러"))
     else:
         res.append(_item("A", "A2", "Big4 12개월 잉여현금흐름이 직전 분기보다 늘었다", None, "자료 부족"))
-    has_ocf = cur is not None and "ocf_yoy" in h and pd.notna(cur.ocf_yoy)
-    ok, d = _less(cur.capex_yoy, cur.ocf_yoy, "{:+.0%}") if has_ocf else (None, "자료 부족")
-    res.append(_item("A", "A3", "Big4 CAPEX 증가율이 영업현금흐름 증가율보다 낮다", ok,
-                     f"영업현금흐름 {cur.ocf_yoy:+.0%} vs CAPEX {cur.capex_yoy:+.0%}" if has_ocf else d))
 
     lv = lambda fid: flags.get(fid)  # noqa: E731
     res.append(_item("B", "B1", "소프트웨어 AI 매출화(F18)가 긍정이다", None if lv("F18") is None else lv("F18") == "긍정", f"F18 {lv('F18') or '없음'}"))
@@ -236,12 +240,18 @@ def bubble_checks(big4, flags, ctx, today):
     else:
         res.append(_item("B", "B5", "클라우드(AWS·Google Cloud) 연환산 매출 증가 ÷ 1년 전 CAPEX가 직전 분기보다 둘 다 높다", None, "자료 부족"))
     ar = ctx.get("anthropic_ratio") or []
-    ok, d = _less(ar[-1], ar[-2], "{:.0%}") if len(ar) >= 2 else (None, "자료 부족")
-    res.append(_item("B", "B3", "Anthropic 매출 대비 컴퓨팅 비용 비율이 직전 분기보다 낮다", ok, d))
+    if len(ar) >= 3:
+        ok = bool(ar[-1] < ar[-2] < ar[-3])
+        d = " → ".join(f"{x:.0%}" for x in ar[-3:]) + " (2분기 연속 하락이면 충족)"
+    else:
+        ok, d = None, "분기 3개 미만이라 판정 불가"
+    res.append(_item("B", "B3", "Anthropic 매출 대비 컴퓨팅 비용 비율이 2분기 연속 낮아졌다", ok, d))
     res.append(_item("B", "B4", "AI 도입 확산(F17)이 긍정이다", None if lv("F17") is None else lv("F17") == "긍정", f"F17 {lv('F17') or '없음'}"))
 
     sr = ctx.get("support_ratio") or []
     ok, d = _less(sr[-1], sr[-2], "{:.0%}") if len(sr) >= 2 else (None, "자료 부족")
+    if ctx.get("support_detail") and ok is not None:
+        d = f"{d} · {ctx['support_detail']}"
     res.append(_item("C", "C1", "NVIDIA 고객 지원성 약정 ÷ 매출이 직전 분기보다 낮다", ok, d))
     res.append(_item("C", "C2", "NVIDIA 수요의 질(F16)이 정상이다", None if lv("F16") is None else lv("F16") == "정상", f"F16 {lv('F16') or '없음'}"))
     res.append(_item("C", "C3", "차입 의존 기업 런웨이(F11)가 경고가 아니다", None if lv("F11") is None else lv("F11") != "경고", f"F11 {lv('F11') or '없음'}"))
@@ -251,10 +261,12 @@ def bubble_checks(big4, flags, ctx, today):
         res.append(_item("C", "C4", "CoreWeave 5년 CDS가 직전 기록보다 낮다", ok, d))
     else:
         res.append(_item("C", "C4", "CoreWeave 5년 CDS가 직전 기록보다 낮다", None, f"최근 {CDS_MAX_AGE}일 안의 새 기록 없음(최신 {cds[-1][0] if cds else '없음'})"))
-    rr = ctx.get("real_rate_3m")
-    res.append(_item("C", "C5", "10년 실질금리가 3개월 전보다 낮다", None if rr is None else rr < 0, "자료 부족" if rr is None else f"3개월 변화 {rr * 100:+.0f}bp"))
-    hy = ctx.get("hy_4w")
-    res.append(_item("C", "C6", "하이일드 스프레드가 4주 전보다 낮다", None if hy is None else hy < 0, "자료 부족" if hy is None else f"4주 변화 {hy * 100:+.0f}bp"))
+    rr = ctx.get("real_rate_20d")
+    res.append(_item("C", "C5", "10년 실질금리가 20거래일 전보다 25bp 이상 낮다", None if rr is None else rr * 100 <= RATE_20D_BP,
+                     "자료 부족" if rr is None else f"20거래일 변화 {rr * 100:+.0f}bp (−25bp 이하면 충족)"))
+    hy = ctx.get("hy_20d")
+    res.append(_item("C", "C6", "하이일드 스프레드가 20거래일 전보다 20bp 이상 낮다", None if hy is None else hy * 100 <= HY_20D_BP,
+                     "자료 부족" if hy is None else f"20거래일 변화 {hy * 100:+.0f}bp (−20bp 이하면 충족)"))
 
     s1 = ctx.get("soxx_1m")
     res.append(_item("D", "D1", "SOXX 최근 1개월 수익률이 0 이상이다", None if s1 is None else s1 >= 0, "자료 부족" if s1 is None else f"{s1:+.1%}"))
@@ -273,6 +285,26 @@ def bubble_checks(big4, flags, ctx, today):
                           None if f7_bad is None else (drop >= CAPEX_DROP and f7_bad), f"CAPEX 증가율 변화 {-drop * 100:+.0f}%p, F7 {lv('F7') or '없음'}"))
     else:
         warn.append(_item("W", "W5", "CAPEX 증가율이 10%p 넘게 낮아졌는데 클라우드(F7)가 긍정이 아니다", None, "자료 부족"))
+    bg = big4.sort_values("period_end").dropna(subset=["fcf_ttm"])
+    if len(bg) >= 5 and 300 <= (bg.period_end.iloc[-1] - bg.period_end.iloc[-5]).days <= 430:
+        a, b = bg.fcf_ttm.iloc[-5], bg.fcf_ttm.iloc[-1]
+        warn.append(_item("W", "W6", "Big4 12개월 잉여현금흐름이 1년 전 같은 분기보다 줄었다", b < a, f"{a / 1e8:,.0f}억 → {b / 1e8:,.0f}억 달러"))
+    else:
+        warn.append(_item("W", "W6", "Big4 12개월 잉여현금흐름이 1년 전 같은 분기보다 줄었다", None, "자료 부족"))
+    co = cur.capex_ocf if cur is not None and "capex_ocf" in h and pd.notna(cur.capex_ocf) else None
+    warn.append(_item("W", "W7", "Big4 CAPEX ÷ 영업현금흐름이 100% 이상이다(번 돈보다 쓰는 돈이 크다)", None if co is None else bool(co >= W_CAPEX_OCF),
+                      "자료 부족" if co is None else f"{co:.0%}"))
+    hl = ctx.get("hy_vs_low")
+    warn.append(_item("W", "W8", "하이일드 스프레드가 252거래일 최저보다 100bp 이상 높다", None if hl is None else hl * 100 >= W_HY_FROM_LOW_BP,
+                      "자료 부족" if hl is None else f"최저 대비 {hl * 100:+.0f}bp"))
+    if cds and (today - pd.Timestamp(cds[-1][0])).days <= CDS_MAX_AGE:
+        warn.append(_item("W", "W9", "CoreWeave 5년 CDS가 1,000bp 이상이다", cds[-1][1] >= W_CDS_BP, f"{cds[-1][1]:,.0f}bp ({cds[-1][0]})"))
+    else:
+        warn.append(_item("W", "W9", "CoreWeave 5년 CDS가 1,000bp 이상이다", None, f"최근 {CDS_MAX_AGE}일 안의 새 기록 없음(최신 {cds[-1][0] if cds else '없음'})"))
+    if len(ar) >= 3:
+        warn.append(_item("W", "W10", "Anthropic 컴퓨팅 비용 ÷ 매출이 2분기 연속 올랐다", bool(ar[-1] > ar[-2] > ar[-3]), " → ".join(f"{x:.0%}" for x in ar[-3:])))
+    else:
+        warn.append(_item("W", "W10", "Anthropic 컴퓨팅 비용 ÷ 매출이 2분기 연속 올랐다", None, "분기 3개 미만이라 판정 불가"))
     return {"resolution": res, "warning": warn}
 
 

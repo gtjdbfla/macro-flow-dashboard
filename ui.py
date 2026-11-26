@@ -182,25 +182,51 @@ def _since_text(item):
             "obs": f"{d[:7]}월분부터", "release": f"{md}부터(발표)"}.get(item.get("since_kind"), f"{md}부터")
 
 
-def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_height=240):
-    """거품론 점검표: 해소 조건(충족=초록)과 악화 신호(발생=빨강)를 나눠 보여 준다. bb는 guide.snapshot['bubble']."""
-    import pandas as pd
-    res, warn = bb["resolution"], bb["warning"]
-    rt = pd.DataFrame([{"묶음": group_labels[i["group"]], "조건": i["text"], "충족": _MARK[i["ok"]], "켜진 날": _since_text(i), "근거": i["detail"]} for i in res])
-    wt = pd.DataFrame([{"신호": i["text"], "발생": _MARK[i["ok"]], "켜진 날": _since_text(i), "근거": i["detail"]} for i in warn])
-    rs = _colored(rt, [i["ok"] for i in res], GOOD_BG)
-    ws = _colored(wt, [i["ok"] for i in warn], BAD_BG)
-    n_ok = sum(i["ok"] is True for i in res)
-    n_w = sum(i["ok"] is True for i in warn)
-    legend = '<span style="background:rgba(34,165,90,0.28);padding:1px 8px;border-radius:4px">초록 = 해소 조건 충족</span> <span style="background:rgba(229,57,53,0.28);padding:1px 8px;border-radius:4px">빨강 = 악화 신호 발생</span> <span style="color:#8a99a3">회색 글씨 = 판정 불가</span>'
-    st.markdown(legend, unsafe_allow_html=True)
-    cols = st.columns([1.5, 1], gap="large") if side_by_side else [st.container(), st.container()]
-    with cols[0]:
-        st.markdown(f"**해소 조건** — {n_ok}/{len(res)} 충족")
-        st.dataframe(rs, hide_index=True, width="stretch", height=res_height, column_config={"켜진 날": st.column_config.TextColumn(width="small")})
-    with cols[1]:
-        st.markdown(f"**악화 신호** — {n_w}/{len(warn)} 발생")
-        st.dataframe(ws, hide_index=True, width="stretch", height=warn_height, column_config={"켜진 날": st.column_config.TextColumn(width="small")})
+BUBBLE_GROUPS = {"A": "현금 회수", "B": "최종 수요", "C": "금융", "D": "시장 분위기(합계 제외)"}
+COUNTED = ("A", "B", "C")
+_BT_CSS = """<style>
+.bt{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.83rem;line-height:1.3;margin:0 0 .4rem 0}
+.bt th:nth-child(1){width:11%}.bt th:nth-child(2){width:33%}.bt th:nth-child(3){width:6%}.bt th:nth-child(4){width:11%}
+.bt th{text-align:left;font-weight:600;color:#8a99a3;padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.35);white-space:nowrap}
+.bt td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.15);vertical-align:top}
+.bt tr.g td{background:rgba(34,165,90,.28);font-weight:600}
+.bt tr.r td{background:rgba(229,57,53,.28);font-weight:600}
+.bt tr.n td{color:#8a99a3}
+.bt td.k{white-space:nowrap;color:#8a99a3}.bt td.s{white-space:nowrap;font-size:.72rem;opacity:.85}
+.bt tr.g td.k,.bt tr.r td.k{color:inherit}
+.bt td.m{color:#8a99a3;font-size:.78rem;white-space:nowrap}
+</style>"""
+
+
+def bubble_counts(bb):
+    """(해소 충족, 해소 전체, 악화 발생, 악화 전체). 해소 조건은 A·B·C만 센다(D 시장 분위기는 합계에서 뺀다)."""
+    res = [i for i in bb["resolution"] if i["group"] in COUNTED]
+    return sum(i["ok"] is True for i in res), len(res), sum(i["ok"] is True for i in bb["warning"]), len(bb["warning"])
+
+
+def _bt_html(rows, headers, hit_class):
+    """rows: [(ok, [셀...], 켜진 날 셀 위치)]. 충족·발생이면 hit_class(g/r), 판정 불가면 n 행 색."""
+    import html as _h
+    head = "".join(f"<th>{_h.escape(x)}</th>" for x in headers)
+    body = []
+    for ok, cells, kinds in rows:
+        cls = hit_class if ok is True else "n" if ok is None else ""
+        tds = "".join(f'<td class="{k}">{_h.escape(c)}</td>' if k else f"<td>{_h.escape(c)}</td>" for c, k in zip(cells, kinds))
+        body.append(f'<tr class="{cls}">{tds}</tr>')
+    return f'<table class="bt"><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table>'
+
+
+def bubble_tables(bb, group_labels=None):
+    """거품론 점검표: 해소 조건(충족=초록) 아래에 악화 신호(발생=빨강)를 놓는다. 스크롤 없이 전부 보이도록 HTML 표로 그린다. bb는 guide.snapshot['bubble']."""
+    n_ok, n_res, n_w, n_warn = bubble_counts(bb)
+    legend = '<span style="background:rgba(34,165,90,0.28);padding:1px 8px;border-radius:4px">초록 = 해소 조건 충족</span> <span style="background:rgba(229,57,53,0.28);padding:1px 8px;border-radius:4px">빨강 = 악화 신호 발생</span> <span style="color:#8a99a3">회색 글씨 = 판정 불가 · 켜진 날은 연속으로 켜진 시작일</span>'
+    st.markdown(_BT_CSS + legend, unsafe_allow_html=True)
+    res_rows = [(i["ok"], [BUBBLE_GROUPS[i["group"]], i["text"], _MARK[i["ok"]], _since_text(i), i["detail"]], ["m", "", "k", "s", ""]) for i in bb["resolution"]]
+    st.markdown(f"**해소 조건** — {n_ok}/{n_res} 충족 <span style='color:#8a99a3;font-size:.8rem'>(시장 분위기 2개는 합계에서 제외)</span>", unsafe_allow_html=True)
+    st.markdown(_bt_html(res_rows, ["묶음", "조건", "충족", "켜진 날", "근거"], "g"), unsafe_allow_html=True)
+    warn_rows = [(i["ok"], ["악화", i["text"], _MARK[i["ok"]], _since_text(i), i["detail"]], ["m", "", "k", "s", ""]) for i in bb["warning"]]
+    st.markdown(f"**악화 신호** — {n_w}/{n_warn} 발생", unsafe_allow_html=True)
+    st.markdown(_bt_html(warn_rows, ["묶음", "신호", "발생", "켜진 날", "근거"], "r"), unsafe_allow_html=True)
     st.caption("'켜진 날'은 연속으로 켜진 시작일입니다. 점검표 기록이 2026-11-20부터라 그 이전부터일 수 있는 항목은 '이전부터', 원자료로 거슬러 계산한 항목은 '○○월분부터'(자료의 관측월) 또는 '부터(발표)'(실적 발표일)로 적었습니다.")
 
 

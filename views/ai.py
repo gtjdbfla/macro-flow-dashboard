@@ -49,12 +49,11 @@ guide_ = load("results/ai_guide.json")
 if guide_ and guide_.get("snapshot", {}).get("bubble"):
     bb = guide_["snapshot"]["bubble"]
     mark = {True: "예", False: "아니오", None: "판정 불가"}
-    n_ok = sum(i["ok"] is True for i in bb["resolution"])
-    n_w = sum(i["ok"] is True for i in bb["warning"])
-    st.markdown(f"#### 거품론 점검표 — 해소 조건 {n_ok}/{len(bb['resolution'])} 충족 · 악화 신호 {n_w}/{len(bb['warning'])} 발생")
+    n_ok, n_res, n_w, n_warn = ui.bubble_counts(bb)
+    st.markdown(f"#### 거품론 점검표 — 해소 조건 {n_ok}/{n_res} 충족 · 악화 신호 {n_w}/{n_warn} 발생")
     st.caption("거품론이 풀리려면 무엇이 확인돼야 하는지(해소 조건)와 거품론이 맞았음을 알리는 신호(악화 신호)를 매주 같은 틀로 점검합니다. "
                "점검 목록이며 합계에 예측력이 있다고 주장하지 않습니다. 정책 불확실성(연준·데이터센터 규제·칩 수출 규제)은 자동 판정하지 않고 주간 브리핑이 뉴스로 답합니다.")
-    ui.bubble_tables(bb, {"A": "A 현금 회수", "B": "B 최종 수요", "C": "C 금융", "D": "D 시장 안정(가격)"})
+    ui.bubble_tables(bb)
     ui.note("기준은 현재 값(대부분 악화 방향)을 이미 안 상태에서 정했습니다. 그래서 지금 대부분 '아니오'인 것은 예정된 결과입니다. "
             "판정 불가는 자료가 오래돼서 판단을 미룬 항목입니다.")
 
