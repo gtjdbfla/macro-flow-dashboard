@@ -83,9 +83,7 @@ if guide and guide.get("snapshot", {}).get("bubble"):
     n_ok = sum(i["ok"] is True for i in bb["resolution"])
     n_w = sum(i["ok"] is True for i in bb["warning"])
     st.markdown(f"**AI 수익성 의문 점검표** — 해소 조건 {n_ok}/{len(bb['resolution'])} 충족 · 악화 신호 {n_w}/{len(bb['warning'])} 발생")
-    groups = {"A": "현금 회수", "B": "최종 수요", "C": "금융", "D": "시장 안정"}
-    rt = pd.DataFrame([{"묶음": groups[i["group"]], "조건": i["text"], "충족": mark[i["ok"]], "근거": i["detail"]} for i in bb["resolution"]])
-    st.dataframe(rt, hide_index=True, width="stretch", height=590)
+    ui.bubble_tables(bb, {"A": "현금 회수", "B": "최종 수요", "C": "금융", "D": "시장 안정"}, side_by_side=False, res_height=590, warn_height=215)
     ui.note("시장이 의심하는 것(번 돈보다 쓰는 돈이 크다, 순환 자금, 높은 금리)이 풀렸는지를 매주 같은 틀로 보는 목록입니다. 지금 대부분 '아니오'인 것은 기준을 현재 값을 알고 정했기 때문입니다. 합계에 예측력이 있다고 주장하지 않습니다.")
 
 c1, c2 = st.columns(2, gap="large")
