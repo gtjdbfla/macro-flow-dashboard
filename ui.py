@@ -178,7 +178,7 @@ def _since_text(item):
     if item.get("ok") is not True or not d:
         return ""
     md = d[5:]
-    return {"exact": f"{md}부터", "record": f"{md} 이전부터", "new": f"{md}부터(항목 신설)"}.get(item.get("since_kind"), f"{md}부터")
+    return {"exact": f"{md}부터", "record": f"{md} 이전부터", "new": f"{md} 신설"}.get(item.get("since_kind"), f"{md}부터")
 
 
 def bubble_tables(bb, group_labels, side_by_side=True, res_height=590, warn_height=240):

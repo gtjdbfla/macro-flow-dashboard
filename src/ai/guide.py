@@ -122,7 +122,7 @@ def early_changes(cur, prev):
 
 def annotate_since(bubble, rows):
     """충족·발생(ok=True)인 점검표 항목마다 연속으로 켜진 시작일을 장부에서 찾아 since, since_kind를 붙인다.
-    since_kind: 'exact'(그 전날 장부에 꺼져 있었음), 'record'(장부 시작일까지 계속 켜져 있어 그 이전부터일 수 있음), 'new'(그 전 장부에 항목이 없었음)."""
+    since_kind: 'exact'(그 전날 장부에 꺼져 있었음), 'record'(장부 시작일까지 계속 켜져 있어 그 이전부터일 수 있음), 'new'(그 전 장부에 항목이 없던 새 항목)."""
     dated = [r for r in rows if r.get("bubble")]
     for key in ("resolution", "warning"):
         for item in bubble.get(key, []):
