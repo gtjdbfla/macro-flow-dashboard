@@ -76,3 +76,18 @@ def test_liquidity_uses_previous_business_day_repo_when_wednesday_is_a_holiday(t
     liquidity = mo.snapshot("2026-11-13", "보통", False, True)["metrics"]["liquidity"]
     assert liquidity["as_of"] == "2026-11-11"
     assert liquidity["value"] == 6090.0
+
+
+def test_inflation_is_stale_only_when_the_latest_published_month_is_old(tmp_path, monkeypatch):
+    monkeypatch.setattr(mo, "PARQUET", tmp_path)
+    months = pd.date_range("2024-01-01", "2026-10-01", freq="MS")
+    values = pd.Series(range(len(months)), index=months, dtype=float) + 300
+    values = values.drop(pd.Timestamp("2025-10-01"))
+    cpi = pd.DataFrame({"date": values.index, "available_at": values.index + pd.Timedelta(days=45),
+                        "value": values.to_numpy()})
+    cpi.to_parquet(tmp_path / "fredv_CPILFESL.parquet")
+
+    fresh = mo.snapshot("2026-11-26", "보통", False, True)["metrics"]["inflation"]
+    assert fresh["as_of"] == "2026-09-01" and fresh["state"] != "stale"   # 10월분은 발표됐고 전년비만 못 구한다
+    old = mo.snapshot("2027-01-20", "보통", False, True)["metrics"]["inflation"]
+    assert old["state"] == "stale"                                          # 10월분 이후 새 발표가 없으면 지연

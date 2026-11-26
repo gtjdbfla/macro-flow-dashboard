@@ -32,13 +32,14 @@ def _first_print(sid, as_of):
             .sort_values("available_at").drop_duplicates("date").set_index("date")["value"].sort_index())
 
 
-def _metric(key, s, change, as_of, max_age):
+def _metric(key, s, change, as_of, max_age, published=None):
     _, _, _, threshold = METRICS[key]
     if s.empty:
         return {"state": "missing", "as_of": None, "value": None, "change": None}
     last = s.index[-1]
     value, delta = s.iloc[-1], change.iloc[-1]
-    if (as_of - last).days > max_age:
+    # 갱신 지연은 값을 계산한 마지막 날이 아니라 가장 최근에 발표된 관측일로 본다(전년 값이 빠져 최신 달의 전년비를 못 구해도 자료가 멈춘 것은 아니다)
+    if (as_of - (published if published is not None else last)).days > max_age:
         state = "stale"
     elif not (np.isfinite(value) and np.isfinite(delta)):
         state = "missing"
@@ -81,7 +82,7 @@ def snapshot(as_of, market_level, shock, market_ready):
         "credit": _metric("credit", credit, credit.diff(20).mul(100).round(6), as_of, 5),
         "liquidity": _metric("liquidity", liquidity, liquidity.pct_change(4, fill_method=None) * 100, as_of, 10),
         "labor": _metric("labor", claims, claims.pct_change(4, fill_method=None) * 100, as_of, 14),
-        "inflation": _metric("inflation", cpi[usable], cpi_change[usable], as_of, 80),
+        "inflation": _metric("inflation", cpi[usable], cpi_change[usable], as_of, 80, published=cpi.index[-1] if len(cpi) else None),
     }
     return {"as_of": as_of.date().isoformat(), "metrics": metrics,
             "outlook": outlook(metrics, market_level, shock, market_ready)}
